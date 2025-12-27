@@ -2,7 +2,7 @@ import type { AppProps } from 'next/app';
 import { FC } from 'react';
 import { WagmiProvider, createConfig, http, sepolia, mainnet } from 'wagmi';
 import { ConnectKitProvider, getDefaultConfig } from 'connectkit';
-import './styles/globals.css';
+import '../styles/globals.css';
 
 const config = createConfig(
   getDefaultConfig({
