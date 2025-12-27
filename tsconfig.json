@@ -5,10 +5,8 @@
     "module": "ESNext",
     "moduleResolution": "node",
     "jsx": "preserve",
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
-    "outDir": ".next",
+    "declaration": false,
+    "sourceMap": false,
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],
@@ -25,10 +23,13 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "incremental": true,
+    "incremental": false,
     "strict": false,
+    "noImplicitAny": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
     "allowJs": true
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"],
+  "include": ["next-env.d.ts", "pages/**/*", "**/*.ts", "**/*.tsx"],
   "exclude": ["node_modules"]
 }
