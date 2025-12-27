@@ -57,7 +57,8 @@ aave-recursive-earn-calculator/
 │   │   │
 │   │   ├── calculator/
 │   │   │   ├── Calculator.tsx        # Composant principal
-│   │   │   ├── AssetSelector.tsx     # Sélection crypto (ETH, USDC, etc.)
+│   │   │   ├── AssetSelector.tsx     # Sélection crypto avec badges (collatéral/empruntable)
+│   │   │   ├── AssetBadges.tsx       # Badges: "Collatéral ✓", "Empruntable ✓", "Gelé ⚠"
 │   │   │   ├── AmountInput.tsx       # Montant du dépôt initial
 │   │   │   ├── IterationSlider.tsx   # Nombre de boucles
 │   │   │   ├── StrategySelector.tsx  # Type de stratégie
@@ -135,6 +136,9 @@ aave-recursive-earn-calculator/
 - [ ] Mode manuel vs automatique (calcul optimal)
 
 ### 2. Paramètres Aave (récupérés en temps réel)
+- [ ] **usageAsCollateralEnabled** - Vérifier si l'actif peut être utilisé comme collatéral
+- [ ] **borrowingEnabled** - Vérifier si l'actif peut être emprunté
+- [ ] **isActive / isFrozen** - Vérifier si le marché est actif
 - [ ] LTV (Loan-to-Value) par actif
 - [ ] Liquidation Threshold
 - [ ] APY de dépôt (Supply APY)
@@ -251,14 +255,19 @@ const liquidationPrice = currentPrice * (1 - (healthFactor - 1) / healthFactor);
 | Optimism | 10 | Aave V3 Optimism |
 | Avalanche | 43114 | Aave V3 Avalanche |
 
-### Actifs principaux
-| Actif | LTV typique | Liquidation Threshold |
-|-------|-------------|----------------------|
-| ETH/WETH | 80% | 82.5% |
-| WBTC | 70% | 75% |
-| USDC | 77% | 80% |
-| DAI | 77% | 80% |
-| USDT | 77% | 80% |
+### Actifs principaux (Aave V3 Ethereum)
+| Actif | Collatéral | Empruntable | LTV | Liquidation |
+|-------|:----------:|:-----------:|-----|-------------|
+| ETH/WETH | ✅ | ✅ | 80% | 82.5% |
+| WBTC | ✅ | ✅ | 70% | 75% |
+| USDC | ✅ | ✅ | 77% | 80% |
+| DAI | ✅ | ✅ | 77% | 80% |
+| USDT | ✅ | ✅ | 77% | 80% |
+| LINK | ✅ | ✅ | 68% | 73% |
+| AAVE | ✅ | ❌ | 66% | 73% |
+| GHO | ❌ | ✅ | 0% | 0% |
+
+> **Note**: Les paramètres varient selon le réseau. Toujours vérifier `usageAsCollateralEnabled` et `borrowingEnabled` via l'API.
 
 ---
 
@@ -272,16 +281,48 @@ query GetReserveData {
     symbol
     name
     decimals
-    baseLTVasCollateral
-    reserveLiquidationThreshold
-    liquidityRate
-    variableBorrowRate
-    stableBorrowRate
+
+    # Flags de disponibilité (IMPORTANT)
+    usageAsCollateralEnabled    # Peut être utilisé comme collatéral?
+    borrowingEnabled            # Peut être emprunté?
+    isActive                    # Marché actif?
+    isFrozen                    # Marché gelé?
+
+    # Paramètres de risque
+    baseLTVasCollateral         # LTV max (ex: 8000 = 80%)
+    reserveLiquidationThreshold # Seuil liquidation (ex: 8250 = 82.5%)
+    reserveLiquidationBonus     # Bonus liquidateur
+
+    # Taux d'intérêt
+    liquidityRate               # APY dépôt (ray: 27 décimales)
+    variableBorrowRate          # APY emprunt variable
+    stableBorrowRate            # APY emprunt stable
+
+    # Données marché
     priceInUsd
     totalLiquidity
     availableLiquidity
   }
 }
+```
+
+### Validation des actifs
+```typescript
+interface AssetValidation {
+  canBeCollateral: boolean;      // usageAsCollateralEnabled
+  canBeBorrowed: boolean;        // borrowingEnabled
+  isMarketActive: boolean;       // isActive && !isFrozen
+  maxLTV: number;                // baseLTVasCollateral / 10000
+  liquidationThreshold: number;  // reserveLiquidationThreshold / 10000
+}
+
+// Filtrer uniquement les actifs utilisables pour le looping
+const validCollateralAssets = reserves.filter(r =>
+  r.usageAsCollateralEnabled &&
+  r.isActive &&
+  !r.isFrozen &&
+  r.baseLTVasCollateral > 0
+);
 ```
 
 ---
