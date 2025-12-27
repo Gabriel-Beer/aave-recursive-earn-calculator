@@ -51,7 +51,7 @@ export async function calculateRecursiveCycles(input: CalculationInput): Promise
     // Calculate health factor for this round
     const hf = await calculateHealthFactor(
       newCollateral.toString(),
-      (totalBorrowed + adjustedBorrowAmount).toString(),
+      totalBorrowed.toString(),
       liquidationThreshold.toString()
     );
 

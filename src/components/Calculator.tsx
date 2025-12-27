@@ -22,6 +22,31 @@ const Calculator: FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const VALID_ASSETS = ['USDC', 'DAI', 'USDT', 'ETH'];
+
+  const validateInputs = (): string | null => {
+    const amount = parseFloat(inputs.initialAmount);
+    if (isNaN(amount) || amount <= 0) {
+      return 'Montant initial doit être positif';
+    }
+
+    const cycles = parseInt(inputs.numberOfCycles, 10);
+    if (isNaN(cycles) || cycles < 1 || cycles > 10) {
+      return 'Nombre de cycles doit être entre 1 et 10';
+    }
+
+    const hf = parseFloat(inputs.targetHealthFactor);
+    if (isNaN(hf) || hf < 1.05) {
+      return 'Health Factor doit être au minimum 1.05';
+    }
+
+    if (!VALID_ASSETS.includes(inputs.assetSymbol)) {
+      return 'Asset invalide';
+    }
+
+    return null;
+  };
+
   const handleInputChange = (field: keyof CalculatorInputs, value: string) => {
     setInputs((prev) => ({
       ...prev,
@@ -33,6 +58,13 @@ const Calculator: FC = () => {
     try {
       setLoading(true);
       setError(null);
+
+      const validationError = validateInputs();
+      if (validationError) {
+        setError(validationError);
+        setLoading(false);
+        return;
+      }
 
       const simulation = await calculateRecursiveCycles({
         initialAmount: inputs.initialAmount,
@@ -56,8 +88,9 @@ const Calculator: FC = () => {
         <h2 className="text-xl font-bold mb-6">Paramètres de simulation</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <label className="block text-sm font-medium mb-2">Montant initial (USD)</label>
+            <label htmlFor="initial-amount" className="block text-sm font-medium mb-2">Montant initial (USD)</label>
             <input
+              id="initial-amount"
               type="number"
               className="input-field"
               value={inputs.initialAmount}
@@ -67,8 +100,9 @@ const Calculator: FC = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">Nombre de cycles</label>
+            <label htmlFor="num-cycles" className="block text-sm font-medium mb-2">Nombre de cycles</label>
             <input
+              id="num-cycles"
               type="number"
               className="input-field"
               value={inputs.numberOfCycles}
@@ -80,8 +114,9 @@ const Calculator: FC = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">Asset</label>
+            <label htmlFor="asset-select" className="block text-sm font-medium mb-2">Asset</label>
             <select
+              id="asset-select"
               className="input-field"
               value={inputs.assetSymbol}
               onChange={(e) => handleInputChange('assetSymbol', e.target.value)}
@@ -94,8 +129,9 @@ const Calculator: FC = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">Health Factor cible</label>
+            <label htmlFor="target-hf" className="block text-sm font-medium mb-2">Health Factor cible</label>
             <input
+              id="target-hf"
               type="number"
               className="input-field"
               value={inputs.targetHealthFactor}
