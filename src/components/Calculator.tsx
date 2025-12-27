@@ -1,6 +1,6 @@
 import { FC, useState } from 'react';
-import { parseEther, formatEther } from 'ethers';
 import { calculateRecursiveCycles } from '@/services/calculator';
+import { RecursiveSimulation } from '@/types/aave';
 import ResultsDisplay from './ResultsDisplay';
 
 interface CalculatorInputs {
@@ -18,7 +18,7 @@ const Calculator: FC = () => {
     targetHealthFactor: '2.0',
   });
 
-  const [results, setResults] = useState<any>(null);
+  const [results, setResults] = useState<RecursiveSimulation | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

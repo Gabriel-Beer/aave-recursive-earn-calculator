@@ -1,4 +1,3 @@
-import { getContract } from '@wagmi/core';
 import { ReserveData, UserAccountData } from '@/types/aave';
 
 // AAVE V3 Pool Address on Ethereum Mainnet

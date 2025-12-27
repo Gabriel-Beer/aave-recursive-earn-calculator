@@ -1,5 +1,5 @@
 import { FC } from 'react';
-import { useAccount, useConnect, useDisconnect } from 'wagmi';
+import { useAccount } from 'wagmi';
 import { ConnectKitButton } from 'connectkit';
 
 const WalletConnect: FC = () => {

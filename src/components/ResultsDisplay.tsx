@@ -1,6 +1,5 @@
 import { FC } from 'react';
-import { formatEther } from 'ethers';
-import { RecursiveSimulation, RiskMetrics } from '@/types/aave';
+import { RecursiveSimulation } from '@/types/aave';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 interface ResultsDisplayProps {

@@ -1,5 +1,5 @@
 import { RecursiveSimulation, RoundProgress, RiskMetrics } from '@/types/aave';
-import { getReserveData, calculateHealthFactor, calculateMaxBorrowAmount } from './aaveService';
+import { getReserveData, calculateHealthFactor } from './aaveService';
 
 interface CalculationInput {
   initialAmount: string;
