@@ -128,12 +128,11 @@ aave-recursive-earn-calculator/
 ## Fonctionnalités détaillées
 
 ### 1. Calculateur de base
-- [ ] Sélection du réseau (Ethereum, Polygon, Arbitrum, Optimism, Avalanche)
-- [ ] Sélection de l'actif à déposer (ETH, WBTC, USDC, etc.)
-- [ ] Sélection de l'actif à emprunter (peut être le même ou différent)
+- [ ] Sélection de l'actif à déposer (avec prix, LTV, APY affichés)
+- [ ] Sélection de l'actif à emprunter (avec APY emprunt affiché)
 - [ ] Montant du dépôt initial
 - [ ] Nombre d'itérations (1 à 20+)
-- [ ] Mode manuel vs automatique (calcul optimal)
+- [ ] Réseau sélectionnable (optionnel, Ethereum par défaut)
 
 ### 2. Paramètres Aave (récupérés en temps réel)
 - [ ] **usageAsCollateralEnabled** - Vérifier si l'actif peut être utilisé comme collatéral
