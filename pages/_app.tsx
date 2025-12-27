@@ -1,6 +1,8 @@
 import type { AppProps } from 'next/app';
-import { FC } from 'react';
-import { WagmiProvider, createConfig, http, sepolia, mainnet } from 'wagmi';
+import { FC, useMemo } from 'react';
+import { WagmiProvider, createConfig, http } from 'wagmi';
+import { mainnet, sepolia } from 'viem/chains';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ConnectKitProvider, getDefaultConfig } from 'connectkit';
 import '../styles/globals.css';
 
@@ -17,13 +19,17 @@ const config = createConfig(
 );
 
 const MyApp: FC<AppProps> = ({ Component, pageProps }) => {
+  const queryClient = useMemo(() => new QueryClient(), []);
+
   return (
     <WagmiProvider config={config}>
-      <ConnectKitProvider>
-        <div className="min-h-screen bg-gray-950">
-          <Component {...pageProps} />
-        </div>
-      </ConnectKitProvider>
+      <QueryClientProvider client={queryClient}>
+        <ConnectKitProvider>
+          <div className="min-h-screen bg-gray-950">
+            <Component {...pageProps} />
+          </div>
+        </ConnectKitProvider>
+      </QueryClientProvider>
     </WagmiProvider>
   );
 };
