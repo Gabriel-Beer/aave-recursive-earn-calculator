@@ -13,7 +13,7 @@
   "dependencies": {
     "react": "18.2.0",
     "react-dom": "18.2.0",
-    "next": "14.2.3",
+    "next": "14.2.35",
     "ethers": "^5.7.2",
     "wagmi": "^2.5.0",
     "@tanstack/react-query": "^5.28.0",
@@ -32,6 +32,6 @@
     "autoprefixer": "^10.4.16",
     "postcss": "^8.4.31",
     "eslint": "^8.50.0",
-    "eslint-config-next": "^14.0.0"
+    "eslint-config-next": "^15.1.0"
   }
 }
