@@ -74,24 +74,68 @@ const POOL_ABI = [
   },
 ] as const;
 
-// Asset addresses on Ethereum Mainnet
+// Asset addresses on Ethereum Mainnet (Aave V3)
 const ASSET_ADDRESSES: Record<string, `0x${string}`> = {
+  // Stablecoins
   USDC: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
   DAI: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
   USDT: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
+  FRAX: '0x853d955aCEf822Db058eb8505911ED77F175b99e',
+  LUSD: '0x5f98805A4E8be255a32880FDeC7F6728C6568bA0',
+  // Major cryptos
   WETH: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
+  ETH: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
   WBTC: '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599',
-  ETH: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', // WETH is used for ETH in AAVE
+  // DeFi tokens
+  LINK: '0x514910771AF9Ca656af840dff83E8264EcF986CA',
+  AAVE: '0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9',
+  UNI: '0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984',
+  MKR: '0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2',
+  SNX: '0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F',
+  CRV: '0xD533a949740bb3306d119CC777fa900bA034cd52',
+  // LSDs (Liquid Staking Derivatives)
+  wstETH: '0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0',
+  rETH: '0xae78736Cd615f374D3085123A210448E74Fc6393',
+  cbETH: '0xBe9895146f7AF43049ca1c1AE358B0541Ea49704',
+  // Other
+  ENS: '0xC18360217D8F7Ab5e7c516566761Ea12Ce7F9D72',
+  '1INCH': '0x111111111117dC0aa78b770fA6A738034120C302',
+  LDO: '0x5A98FcBEA516Cf06857215779Fd812CA3beF1B32',
+  RPL: '0xD33526068D116cE69F19A9ee46F0bd304F21A51f',
+  BAL: '0xba100000625a3754423978a60c9317c58a424e3D',
+  GHO: '0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f',
 };
 
 // Asset metadata
-const ASSET_METADATA: Record<string, { id: string; name: string }> = {
-  USDC: { id: '1', name: 'USD Coin' },
-  DAI: { id: '2', name: 'Dai Stablecoin' },
-  USDT: { id: '3', name: 'Tether USD' },
-  WETH: { id: '4', name: 'Wrapped Ether' },
-  WBTC: { id: '5', name: 'Wrapped Bitcoin' },
-  ETH: { id: '4', name: 'Ethereum' },
+const ASSET_METADATA: Record<string, { id: string; name: string; category: string }> = {
+  // Stablecoins
+  USDC: { id: '1', name: 'USD Coin', category: 'Stablecoin' },
+  DAI: { id: '2', name: 'Dai Stablecoin', category: 'Stablecoin' },
+  USDT: { id: '3', name: 'Tether USD', category: 'Stablecoin' },
+  FRAX: { id: '6', name: 'Frax', category: 'Stablecoin' },
+  LUSD: { id: '7', name: 'Liquity USD', category: 'Stablecoin' },
+  GHO: { id: '24', name: 'GHO Stablecoin', category: 'Stablecoin' },
+  // Major cryptos
+  ETH: { id: '4', name: 'Ethereum', category: 'Major' },
+  WETH: { id: '4', name: 'Wrapped Ether', category: 'Major' },
+  WBTC: { id: '5', name: 'Wrapped Bitcoin', category: 'Major' },
+  // DeFi tokens
+  LINK: { id: '8', name: 'Chainlink', category: 'DeFi' },
+  AAVE: { id: '9', name: 'Aave', category: 'DeFi' },
+  UNI: { id: '10', name: 'Uniswap', category: 'DeFi' },
+  MKR: { id: '11', name: 'Maker', category: 'DeFi' },
+  SNX: { id: '12', name: 'Synthetix', category: 'DeFi' },
+  CRV: { id: '13', name: 'Curve DAO', category: 'DeFi' },
+  BAL: { id: '23', name: 'Balancer', category: 'DeFi' },
+  '1INCH': { id: '19', name: '1inch', category: 'DeFi' },
+  // LSDs
+  wstETH: { id: '14', name: 'Wrapped stETH', category: 'LSD' },
+  rETH: { id: '15', name: 'Rocket Pool ETH', category: 'LSD' },
+  cbETH: { id: '16', name: 'Coinbase ETH', category: 'LSD' },
+  // Other
+  ENS: { id: '17', name: 'ENS', category: 'Other' },
+  LDO: { id: '20', name: 'Lido DAO', category: 'Other' },
+  RPL: { id: '21', name: 'Rocket Pool', category: 'Other' },
 };
 
 // Mock data for fallback
@@ -392,4 +436,37 @@ export async function getMultipleReserveData(symbols: string[]): Promise<Record<
   );
 
   return Object.fromEntries(results);
+}
+
+/**
+ * Returns list of all supported assets grouped by category
+ */
+export function getSupportedAssets(): { symbol: string; name: string; category: string }[] {
+  return Object.entries(ASSET_METADATA)
+    .filter(([symbol]) => symbol !== 'WETH') // Hide WETH duplicate, use ETH instead
+    .map(([symbol, meta]) => ({
+      symbol,
+      name: meta.name,
+      category: meta.category,
+    }))
+    .sort((a, b) => {
+      // Sort by category order, then alphabetically
+      const categoryOrder: Record<string, number> = {
+        'Stablecoin': 1,
+        'Major': 2,
+        'LSD': 3,
+        'DeFi': 4,
+        'Other': 5
+      };
+      const catDiff = (categoryOrder[a.category] || 99) - (categoryOrder[b.category] || 99);
+      if (catDiff !== 0) return catDiff;
+      return a.symbol.localeCompare(b.symbol);
+    });
+}
+
+/**
+ * Get asset categories for grouping in UI
+ */
+export function getAssetCategories(): string[] {
+  return ['Stablecoin', 'Major', 'LSD', 'DeFi', 'Other'];
 }

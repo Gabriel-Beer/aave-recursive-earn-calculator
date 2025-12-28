@@ -1,6 +1,7 @@
-import { FC, useState, useEffect } from 'react';
+import { FC, useState, useEffect, useMemo, useCallback } from 'react';
 import { calculateRecursiveCycles } from '@/services/calculator';
-import { RecursiveSimulation } from '@/types/aave';
+import { getReserveData, getSupportedAssets } from '@/services/aaveService';
+import { RecursiveSimulation, ReserveData } from '@/types/aave';
 import ResultsDisplay from './ResultsDisplay';
 import Tooltip from './Tooltip';
 
@@ -36,8 +37,39 @@ const Calculator: FC = () => {
   const [results, setResults] = useState<RecursiveSimulation | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [liveRates, setLiveRates] = useState<ReserveData | null>(null);
+  const [loadingRates, setLoadingRates] = useState(false);
 
-  const VALID_ASSETS = ['USDC', 'DAI', 'USDT', 'ETH'];
+  // Get all supported assets grouped by category
+  const supportedAssets = useMemo(() => getSupportedAssets(), []);
+  const assetsByCategory = useMemo(() => {
+    const grouped: Record<string, typeof supportedAssets> = {};
+    supportedAssets.forEach(asset => {
+      if (!grouped[asset.category]) {
+        grouped[asset.category] = [];
+      }
+      grouped[asset.category].push(asset);
+    });
+    return grouped;
+  }, [supportedAssets]);
+
+  // Fetch live rates when asset changes
+  const fetchLiveRates = useCallback(async (symbol: string) => {
+    setLoadingRates(true);
+    try {
+      const data = await getReserveData(symbol);
+      setLiveRates(data);
+    } catch (err) {
+      console.error('Failed to fetch rates:', err);
+      setLiveRates(null);
+    } finally {
+      setLoadingRates(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchLiveRates(inputs.assetSymbol);
+  }, [inputs.assetSymbol, fetchLiveRates]);
 
   // Auto-calculate complementary value based on mode
   useEffect(() => {
@@ -81,7 +113,7 @@ const Calculator: FC = () => {
       }
     }
 
-    if (!VALID_ASSETS.includes(inputs.assetSymbol)) {
+    if (!supportedAssets.some(a => a.symbol === inputs.assetSymbol)) {
       return 'Asset invalide';
     }
 
@@ -228,12 +260,61 @@ const Calculator: FC = () => {
               value={inputs.assetSymbol}
               onChange={(e) => handleInputChange('assetSymbol', e.target.value)}
             >
-              {VALID_ASSETS.map((asset) => (
-                <option key={asset} value={asset}>
-                  {asset}
-                </option>
+              {Object.entries(assetsByCategory).map(([category, assets]) => (
+                <optgroup key={category} label={category === 'LSD' ? 'Liquid Staking' : category}>
+                  {assets.map((asset) => (
+                    <option key={asset.symbol} value={asset.symbol}>
+                      {asset.symbol} - {asset.name}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
+          </div>
+
+          {/* Live Rates Display */}
+          <div className="input-group">
+            <label className="input-label">Taux en direct (Aave V3)</label>
+            {loadingRates ? (
+              <div className="flex items-center gap-2 text-slate-400 text-sm py-3">
+                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Chargement des taux...
+              </div>
+            ) : liveRates ? (
+              <div className="grid grid-cols-2 gap-2 p-3 bg-slate-800/50 rounded-xl border border-slate-700">
+                <div className="text-center p-2 bg-green-500/10 rounded-lg">
+                  <div className="text-xs text-slate-400 mb-1">Supply APY</div>
+                  <div className="text-lg font-bold text-green-400">
+                    {(parseFloat(liveRates.liquidityRate) * 100).toFixed(2)}%
+                  </div>
+                </div>
+                <div className="text-center p-2 bg-red-500/10 rounded-lg">
+                  <div className="text-xs text-slate-400 mb-1">Borrow APY</div>
+                  <div className="text-lg font-bold text-red-400">
+                    {(parseFloat(liveRates.variableBorrowRate) * 100).toFixed(2)}%
+                  </div>
+                </div>
+                <div className="text-center p-2 bg-purple-500/10 rounded-lg">
+                  <div className="text-xs text-slate-400 mb-1">LTV Max</div>
+                  <div className="text-lg font-bold text-purple-400">
+                    {(parseFloat(liveRates.ltv) * 100).toFixed(0)}%
+                  </div>
+                </div>
+                <div className="text-center p-2 bg-blue-500/10 rounded-lg">
+                  <div className="text-xs text-slate-400 mb-1">Liq. Threshold</div>
+                  <div className="text-lg font-bold text-blue-400">
+                    {(parseFloat(liveRates.liquidationThreshold) * 100).toFixed(0)}%
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-sm text-slate-500 py-3">
+                Impossible de charger les taux
+              </div>
+            )}
           </div>
 
           {/* Borrow Percentage - Protection against depeg */}
