@@ -30,6 +30,10 @@ export interface RecursiveSimulation {
   finalAmount: string;
   totalBorrowed: string;
   totalInterestEarned: string;
+  leverage: string;
+  supplyAPY: string;
+  borrowAPY: string;
+  netAPY: string;
   riskMetrics: RiskMetrics;
   progressionByRound: RoundProgress[];
 }
@@ -37,6 +41,7 @@ export interface RecursiveSimulation {
 export interface RiskMetrics {
   healthFactor: string;
   liquidationPrice: string;
+  maxPriceDropPercent: string;
   riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   warningMessages: string[];
 }

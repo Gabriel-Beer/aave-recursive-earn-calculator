@@ -79,14 +79,15 @@ const ResultsDisplay: FC<ResultsDisplayProps> = ({ results }) => {
     }
   };
 
-  // Calculate additional metrics
+  // Use values from calculation
   const initialAmount = parseFloat(results.initialAmount);
   const finalAmount = parseFloat(results.finalAmount);
   const totalBorrowed = parseFloat(results.totalBorrowed);
-  const totalInterest = parseFloat(results.totalInterestEarned);
-  const leverage = finalAmount / initialAmount;
-  const netGain = finalAmount - initialAmount;
-  const netGainPercentage = ((netGain / initialAmount) * 100).toFixed(2);
+  const leverage = parseFloat(results.leverage);
+  const netAPY = parseFloat(results.netAPY);
+  const supplyAPY = parseFloat(results.supplyAPY);
+  const borrowAPY = parseFloat(results.borrowAPY);
+  const maxPriceDrop = parseFloat(results.riskMetrics.maxPriceDropPercent);
   const healthFactor = parseFloat(results.riskMetrics.healthFactor) || 0;
 
   return (
@@ -142,9 +143,11 @@ const ResultsDisplay: FC<ResultsDisplayProps> = ({ results }) => {
               </svg>
             </div>
             <div>
-              <p className="text-xs text-slate-400 mb-1">Gain potentiel</p>
-              <p className="text-xl font-bold text-green-400">+${netGain.toFixed(2)}</p>
-              <p className="text-xs text-green-400/70">+{netGainPercentage}%</p>
+              <p className="text-xs text-slate-400 mb-1">APY Net</p>
+              <p className={`text-xl font-bold ${netAPY >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {netAPY >= 0 ? '+' : ''}{netAPY.toFixed(2)}%
+              </p>
+              <p className="text-xs text-slate-500">Supply {supplyAPY.toFixed(2)}% - Borrow {borrowAPY.toFixed(2)}%</p>
             </div>
           </div>
 
@@ -190,20 +193,21 @@ const ResultsDisplay: FC<ResultsDisplayProps> = ({ results }) => {
           </div>
 
           <div className="stat-card">
-            <div className="stat-icon bg-pink-500/20">
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-pink-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="12" y1="1" x2="12" y2="23"/>
-                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+            <div className={`stat-icon ${maxPriceDrop < 20 ? 'bg-red-500/20' : maxPriceDrop < 40 ? 'bg-yellow-500/20' : 'bg-green-500/20'}`}>
+              <svg xmlns="http://www.w3.org/2000/svg" className={`w-5 h-5 ${maxPriceDrop < 20 ? 'text-red-400' : maxPriceDrop < 40 ? 'text-yellow-400' : 'text-green-400'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 22V8M5 12l7-7 7 7"/>
               </svg>
             </div>
             <div>
               <p className="text-xs text-slate-400 mb-1">
-                <Tooltip content={TOOLTIPS.liquidationPrice}>
-                  Prix liquidation
+                <Tooltip content="Chute de prix maximale avant liquidation. Plus ce % est eleve, plus vous etes en securite.">
+                  Marge de securite
                 </Tooltip>
               </p>
-              <p className="text-xl font-bold text-pink-400">${results.riskMetrics.liquidationPrice}</p>
-              <p className="text-xs text-slate-500">a eviter</p>
+              <p className={`text-xl font-bold ${maxPriceDrop < 20 ? 'text-red-400' : maxPriceDrop < 40 ? 'text-yellow-400' : 'text-green-400'}`}>
+                {maxPriceDrop.toFixed(1)}%
+              </p>
+              <p className="text-xs text-slate-500">avant liquidation</p>
             </div>
           </div>
         </div>
