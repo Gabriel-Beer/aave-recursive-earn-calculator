@@ -11,6 +11,7 @@ interface CalculatorInputs {
   assetSymbol: string;
   numberOfCycles: string;
   targetHealthFactor: string;
+  borrowPercentage: string; // 50 to 100
 }
 
 const TOOLTIPS = {
@@ -19,6 +20,7 @@ const TOOLTIPS = {
   healthFactor: 'Ratio de securite de votre position. En dessous de 1.0, vous risquez la liquidation. Recommande: > 1.5 pour les debutants.',
   ltv: 'Loan-to-Value: pourcentage maximum que vous pouvez emprunter par rapport a votre collateral.',
   asset: 'La cryptomonnaie que vous utilisez comme collateral et pour emprunter.',
+  borrowPercentage: 'Pourcentage du maximum empruntable a utiliser a chaque cycle. 80% = emprunte 80% du max possible. Reduit le risque de liquidation en cas de depeg.',
 };
 
 const Calculator: FC = () => {
@@ -28,6 +30,7 @@ const Calculator: FC = () => {
     assetSymbol: 'USDC',
     numberOfCycles: '3',
     targetHealthFactor: '1.5',
+    borrowPercentage: '80',
   });
 
   const [results, setResults] = useState<RecursiveSimulation | null>(null);
@@ -114,6 +117,8 @@ const Calculator: FC = () => {
         assetSymbol: inputs.assetSymbol,
         numberOfCycles: parseInt(inputs.numberOfCycles, 10),
         targetHealthFactor: parseFloat(inputs.targetHealthFactor),
+        borrowPercentage: parseFloat(inputs.borrowPercentage) / 100, // Convert to decimal
+        mode: calculationMode,
       });
 
       setResults(simulation);
@@ -229,6 +234,56 @@ const Calculator: FC = () => {
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* Borrow Percentage - Protection against depeg */}
+          <div className="input-group md:col-span-2">
+            <label htmlFor="borrow-percentage" className="input-label">
+              <Tooltip content={TOOLTIPS.borrowPercentage}>
+                Pourcentage d&apos;emprunt
+              </Tooltip>
+              <span className="ml-2 text-sm font-bold text-purple-400">{inputs.borrowPercentage}%</span>
+            </label>
+            <div className="relative mt-2">
+              <input
+                id="borrow-percentage"
+                type="range"
+                className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                value={inputs.borrowPercentage}
+                onChange={(e) => handleInputChange('borrowPercentage', e.target.value)}
+                min="50"
+                max="100"
+                step="5"
+              />
+              <div className="flex justify-between text-xs text-slate-500 mt-1">
+                <span>50% (Prudent)</span>
+                <span>75%</span>
+                <span>100% (Max)</span>
+              </div>
+            </div>
+            <div className="mt-2 flex items-center gap-1">
+              {[50, 60, 70, 80, 90, 100].map((pct) => (
+                <button
+                  key={pct}
+                  type="button"
+                  onClick={() => handleInputChange('borrowPercentage', pct.toString())}
+                  className={`flex-1 py-1.5 text-xs rounded-lg transition-all ${
+                    parseInt(inputs.borrowPercentage) === pct
+                      ? 'bg-purple-500 text-white'
+                      : 'bg-slate-700/50 text-slate-400 hover:bg-slate-700'
+                  }`}
+                >
+                  {pct}%
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 text-xs text-slate-500">
+              {parseInt(inputs.borrowPercentage) <= 70
+                ? '🛡️ Prudent - Bonne protection contre les variations de prix'
+                : parseInt(inputs.borrowPercentage) <= 85
+                ? '⚖️ Modere - Equilibre entre rendement et securite'
+                : '⚠️ Agressif - Rendement maximum mais risque de liquidation accru'}
+            </p>
           </div>
 
           {/* Number of Cycles - Primary in cycles mode */}

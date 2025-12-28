@@ -6,10 +6,12 @@ interface CalculationInput {
   assetSymbol: string;
   numberOfCycles: number;
   targetHealthFactor: number;
+  borrowPercentage: number; // 0.5 to 1.0 (50% to 100% of max borrow)
+  mode: 'cycles' | 'healthFactor';
 }
 
 export async function calculateRecursiveCycles(input: CalculationInput): Promise<RecursiveSimulation> {
-  const { initialAmount, assetSymbol, numberOfCycles, targetHealthFactor } = input;
+  const { initialAmount, assetSymbol, numberOfCycles, targetHealthFactor, borrowPercentage, mode } = input;
 
   // Fetch reserve data
   const reserveData = await getReserveData(assetSymbol);
@@ -18,35 +20,71 @@ export async function calculateRecursiveCycles(input: CalculationInput): Promise
   const liquidityRate = parseFloat(reserveData.liquidityRate);
   const ltv = parseFloat(reserveData.ltv);
   const liquidationThreshold = parseFloat(reserveData.liquidationThreshold);
-  const variableBorrowRate = parseFloat(reserveData.variableBorrowRate);
 
   let currentCollateral = initialAmountNum;
   let totalBorrowed = 0;
   let totalInterestEarned = 0;
   const progressionByRound: RoundProgress[] = [];
 
-  // Simulate recursive cycles
-  for (let i = 1; i <= numberOfCycles; i++) {
-    // Calculate max borrow amount based on collateral and LTV
-    const maxBorrow = currentCollateral * ltv;
+  // Determine max cycles based on mode
+  const maxCycles = mode === 'cycles' ? numberOfCycles : 20; // Max 20 cycles in HF mode
+  let actualCycles = 0;
 
-    // Adjust borrow amount to maintain target health factor
-    // Health Factor = (Collateral * Liquidation Threshold) / Total Borrows
-    // We need: HF >= targetHealthFactor
-    const adjustedBorrowAmount = Math.min(
-      maxBorrow,
-      (currentCollateral * liquidationThreshold) / targetHealthFactor
-    );
+  // Simulate recursive cycles
+  for (let i = 1; i <= maxCycles; i++) {
+    // Calculate max borrow amount based on collateral and LTV
+    // Apply borrowPercentage to limit exposure (protection contre depeg)
+    const maxBorrow = currentCollateral * ltv * borrowPercentage;
+
+    // Calculate what we would borrow this cycle
+    let borrowAmountThisCycle = maxBorrow;
+
+    // In health factor mode, check if we've reached target HF
+    if (mode === 'healthFactor') {
+      // Calculate what the health factor would be if we borrow this amount
+      const potentialTotalBorrowed = totalBorrowed + borrowAmountThisCycle;
+      const potentialCollateral = currentCollateral + borrowAmountThisCycle;
+      const potentialHF = (potentialCollateral * liquidationThreshold) / potentialTotalBorrowed;
+
+      // If we would go below target HF, reduce borrow amount or stop
+      if (potentialHF < targetHealthFactor) {
+        // Calculate exact amount to borrow to reach target HF
+        // HF = (collateral + borrow) * LT / (totalBorrowed + borrow)
+        // HF * (totalBorrowed + borrow) = (collateral + borrow) * LT
+        // HF * totalBorrowed + HF * borrow = collateral * LT + borrow * LT
+        // HF * borrow - borrow * LT = collateral * LT - HF * totalBorrowed
+        // borrow * (HF - LT) = collateral * LT - HF * totalBorrowed
+        // borrow = (collateral * LT - HF * totalBorrowed) / (HF - LT)
+
+        if (targetHealthFactor > liquidationThreshold) {
+          borrowAmountThisCycle = (currentCollateral * liquidationThreshold - targetHealthFactor * totalBorrowed) / (targetHealthFactor - liquidationThreshold);
+          borrowAmountThisCycle = Math.max(0, Math.min(borrowAmountThisCycle, maxBorrow));
+        } else {
+          borrowAmountThisCycle = 0;
+        }
+
+        // If we can't borrow enough to make a difference, stop
+        if (borrowAmountThisCycle < initialAmountNum * 0.01) {
+          break;
+        }
+      }
+    }
+
+    // Skip if nothing to borrow
+    if (borrowAmountThisCycle <= 0) {
+      break;
+    }
 
     // Calculate interest for this cycle
     const interestForCycle = currentCollateral * liquidityRate;
     totalInterestEarned += interestForCycle;
 
     // Re-deposit: new collateral = old collateral + borrowed + interest
-    const newCollateral = currentCollateral + adjustedBorrowAmount + interestForCycle;
+    const newCollateral = currentCollateral + borrowAmountThisCycle + interestForCycle;
 
     // Track total borrowed
-    totalBorrowed += adjustedBorrowAmount;
+    totalBorrowed += borrowAmountThisCycle;
+    actualCycles = i;
 
     // Calculate health factor for this round
     const hf = await calculateHealthFactor(
@@ -58,12 +96,20 @@ export async function calculateRecursiveCycles(input: CalculationInput): Promise
     progressionByRound.push({
       round: i,
       collateralAmount: currentCollateral.toFixed(2),
-      borrowAmount: adjustedBorrowAmount.toFixed(2),
+      borrowAmount: borrowAmountThisCycle.toFixed(2),
       healthFactor: hf,
       cumulativeInterest: totalInterestEarned.toFixed(2),
     });
 
     currentCollateral = newCollateral;
+
+    // In health factor mode, check if we've reached target
+    if (mode === 'healthFactor') {
+      const currentHF = parseFloat(hf);
+      if (currentHF <= targetHealthFactor * 1.05) {
+        break; // Close enough to target
+      }
+    }
   }
 
   // Calculate final metrics
@@ -76,7 +122,7 @@ export async function calculateRecursiveCycles(input: CalculationInput): Promise
   );
 
   return {
-    cycles: numberOfCycles,
+    cycles: actualCycles,
     initialAmount: initialAmountNum.toFixed(2),
     finalAmount: finalAmount.toFixed(2),
     totalBorrowed: totalBorrowed.toFixed(2),
