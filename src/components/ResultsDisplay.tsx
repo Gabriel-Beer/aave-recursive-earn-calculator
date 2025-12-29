@@ -89,6 +89,16 @@ const ResultsDisplay: FC<ResultsDisplayProps> = ({ results }) => {
   const borrowAPY = parseFloat(results.borrowAPY);
   const maxPriceDrop = parseFloat(results.riskMetrics.maxPriceDropPercent);
   const healthFactor = parseFloat(results.riskMetrics.healthFactor) || 0;
+  const annualInterest = parseFloat(results.totalInterestEarned);
+
+  // Calculate projections for different time periods
+  const projections = [
+    { period: '1 mois', months: 1, interest: annualInterest / 12 },
+    { period: '3 mois', months: 3, interest: (annualInterest / 12) * 3 },
+    { period: '6 mois', months: 6, interest: (annualInterest / 12) * 6 },
+    { period: '1 an', months: 12, interest: annualInterest },
+    { period: '2 ans', months: 24, interest: annualInterest * 2 },
+  ];
 
   return (
     <div className="space-y-6">
@@ -248,9 +258,12 @@ const ResultsDisplay: FC<ResultsDisplayProps> = ({ results }) => {
                 <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
               </svg>
             </div>
-            <p className="text-sm text-slate-400">Interets gagnes</p>
+            <p className="text-sm text-slate-400">Interets nets / an</p>
           </div>
-          <p className="text-2xl font-bold text-purple-400">${results.totalInterestEarned}</p>
+          <p className={`text-2xl font-bold ${annualInterest >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+            {annualInterest >= 0 ? '+' : ''}${annualInterest.toFixed(2)}
+          </p>
+          <p className="text-xs text-slate-500 mt-1">par an (APY {netAPY.toFixed(2)}%)</p>
         </div>
 
         <div className="card">
@@ -264,6 +277,59 @@ const ResultsDisplay: FC<ResultsDisplayProps> = ({ results }) => {
             <p className="text-sm text-slate-400">Total emprunte</p>
           </div>
           <p className="text-2xl font-bold text-pink-400">${results.totalBorrowed}</p>
+        </div>
+      </div>
+
+      {/* Projections temporelles */}
+      <div className="card-elevated">
+        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-green-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12 6 12 12 16 14"/>
+          </svg>
+          Projection des gains dans le temps
+        </h3>
+        <p className="text-sm text-slate-400 mb-4">
+          Estimation des interets nets selon la duree de maintien de la position (taux constants)
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          {projections.map((proj) => (
+            <div
+              key={proj.period}
+              className={`p-4 rounded-xl border text-center transition-all ${
+                proj.months === 12
+                  ? 'bg-green-500/10 border-green-500/30'
+                  : 'bg-slate-800/50 border-slate-700 hover:border-slate-600'
+              }`}
+            >
+              <p className={`text-xs mb-1 ${proj.months === 12 ? 'text-green-400' : 'text-slate-400'}`}>
+                {proj.period}
+              </p>
+              <p className={`text-lg font-bold ${
+                proj.interest >= 0 ? 'text-green-400' : 'text-red-400'
+              }`}>
+                {proj.interest >= 0 ? '+' : ''}${proj.interest.toFixed(2)}
+              </p>
+              {proj.months === 12 && (
+                <span className="inline-block mt-1 text-[10px] bg-green-500/20 text-green-300 px-2 py-0.5 rounded-full">
+                  Base annuelle
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+          <p className="text-xs text-blue-300 flex items-start gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="16" x2="12" y2="12"/>
+              <line x1="12" y1="8" x2="12.01" y2="8"/>
+            </svg>
+            <span>
+              Ces projections supposent des taux constants. Les taux Aave varient en fonction de l&apos;offre et la demande.
+              Les gains reels peuvent differer significativement.
+            </span>
+          </p>
         </div>
       </div>
 
