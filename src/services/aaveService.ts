@@ -240,14 +240,22 @@ const MOCK_RATES: Record<string, ReserveData> = {
 
 // RAY = 10^27 (used for rate calculations in AAVE)
 const RAY = BigInt(10 ** 27);
+const SECONDS_PER_YEAR = 31536000; // Number of seconds in a year
 
 /**
- * Converts AAVE ray value (10^27) to a decimal percentage string
+ * Converts AAVE ray value (10^27) to APY percentage string
+ * Formula: APY = (((1 + ((rate / 10^27) / 31536000)) ^ 31536000) - 1) * 100
+ * This accounts for compound interest over a year
  */
 function rayToPercent(rayValue: bigint): string {
-  // Convert ray to percentage (divide by 10^27 to get decimal)
-  const percent = Number(rayValue) / Number(RAY);
-  return percent.toFixed(6);
+  // Convert ray to decimal rate (rate / 10^27)
+  const decimalRate = Number(rayValue) / Number(RAY);
+
+  // Apply annual compounding formula: (1 + rate/secondsPerYear)^secondsPerYear - 1
+  const apy = (Math.pow(1 + decimalRate / SECONDS_PER_YEAR, SECONDS_PER_YEAR) - 1);
+
+  // Return as percentage string (multiply by 100 for percentage, but keep 6 decimals for precision)
+  return (apy * 100).toFixed(6);
 }
 
 /**
@@ -267,6 +275,11 @@ export async function getReserveData(assetSymbol: string): Promise<ReserveData> 
   }
 
   try {
+    // Log RPC request details
+    console.log(`🔗 Fetching Aave V3 data for ${assetSymbol} (${assetAddress})`);
+    console.log(`   RPC Endpoint: ${process.env.NEXT_PUBLIC_RPC_URL || 'https://eth.llamarpc.com'}`);
+    console.log(`   Pool Data Provider: ${AAVE_POOL_DATA_PROVIDER}`);
+
     // Fetch reserve data and configuration in parallel
     const [reserveData, configData] = await Promise.all([
       publicClient.readContract({
@@ -282,6 +295,8 @@ export async function getReserveData(assetSymbol: string): Promise<ReserveData> 
         args: [assetAddress],
       }),
     ]);
+
+    console.log(`✅ RPC response received (2 calls, eth_call method)`);
 
     // Extract values from reserve data
     const [
@@ -317,6 +332,37 @@ export async function getReserveData(assetSymbol: string): Promise<ReserveData> 
       ? Number(totalDebt) / Number(totalLiquidity)
       : 0;
 
+    // Parse rates for console output
+    const supplyAPY = rayToPercent(liquidityRate);
+    const borrowAPY = rayToPercent(variableBorrowRate);
+    const ltvPercent = bpsToDecimal(ltv);
+    const liqThresholdPercent = bpsToDecimal(liquidationThreshold);
+
+    // Log decoded response data
+    console.group(`📊 Aave V3 Reserve Data - ${assetSymbol}`);
+    console.log(`Asset Address: ${assetAddress}`);
+    console.log(`Contract: ${AAVE_POOL_DATA_PROVIDER}`);
+    console.group('📈 Rates (APY)');
+    console.log(`Supply APY: ${supplyAPY} (${(parseFloat(supplyAPY) * 100).toFixed(2)}%)`);
+    console.log(`Borrow APY: ${borrowAPY} (${(parseFloat(borrowAPY) * 100).toFixed(2)}%)`);
+    console.log(`Stable Borrow APY: ${rayToPercent(stableBorrowRate)} (${(parseFloat(rayToPercent(stableBorrowRate)) * 100).toFixed(2)}%)`);
+    console.groupEnd();
+    console.group('💰 Liquidity');
+    console.log(`Total Supplied: ${formatUnits(totalLiquidity, Number(decimals))} ${assetSymbol}`);
+    console.log(`Total Stable Debt: ${formatUnits(totalStableDebt, Number(decimals))} ${assetSymbol}`);
+    console.log(`Total Variable Debt: ${formatUnits(totalVariableDebt, Number(decimals))} ${assetSymbol}`);
+    console.log(`Utilization Rate: ${(utilizationRate * 100).toFixed(2)}%`);
+    console.groupEnd();
+    console.group('⚙️ Configuration');
+    console.log(`LTV (Loan-to-Value): ${ltvPercent} (${(parseFloat(ltvPercent) * 100).toFixed(2)}%)`);
+    console.log(`Liquidation Threshold: ${liqThresholdPercent} (${(parseFloat(liqThresholdPercent) * 100).toFixed(2)}%)`);
+    console.log(`Liquidation Bonus: ${((Number(liquidationBonus) - 10000) / 10000).toFixed(4)} (${(((Number(liquidationBonus) - 10000) / 100)).toFixed(2)}%)`);
+    console.log(`Reserve Factor: ${bpsToDecimal(reserveFactor)} (${(parseFloat(bpsToDecimal(reserveFactor)) * 100).toFixed(2)}%)`);
+    console.log(`Decimals: ${Number(decimals)}`);
+    console.log(`Last Update: ${new Date(Number(lastUpdateTimestamp) * 1000).toISOString()}`);
+    console.groupEnd();
+    console.groupEnd();
+
     return {
       id: metadata.id,
       symbol: assetSymbol,
@@ -324,12 +370,12 @@ export async function getReserveData(assetSymbol: string): Promise<ReserveData> 
       decimals: Number(decimals),
       totalLiquidity: formatUnits(totalLiquidity, Number(decimals)),
       utilizationRate: utilizationRate.toFixed(4),
-      variableBorrowRate: rayToPercent(variableBorrowRate),
+      variableBorrowRate: borrowAPY,
       stableBorrowRate: rayToPercent(stableBorrowRate),
-      liquidityRate: rayToPercent(liquidityRate),
+      liquidityRate: supplyAPY,
       reserveFactor: bpsToDecimal(reserveFactor),
-      ltv: bpsToDecimal(ltv),
-      liquidationThreshold: bpsToDecimal(liquidationThreshold),
+      ltv: ltvPercent,
+      liquidationThreshold: liqThresholdPercent,
       // Liquidation bonus in AAVE is stored as 10000 + bonus (e.g., 10500 = 5% bonus)
       liquidationBonus: ((Number(liquidationBonus) - 10000) / 10000).toFixed(4),
       lastUpdateTimestamp: Number(lastUpdateTimestamp) * 1000, // Convert to milliseconds
