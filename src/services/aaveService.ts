@@ -243,9 +243,10 @@ const RAY = BigInt(10 ** 27);
 const SECONDS_PER_YEAR = 31536000; // Number of seconds in a year
 
 /**
- * Converts AAVE ray value (10^27) to APY percentage string
- * Formula: APY = (((1 + ((rate / 10^27) / 31536000)) ^ 31536000) - 1) * 100
+ * Converts AAVE ray value (10^27) to APY decimal string
+ * Formula: APY = ((1 + ((rate / 10^27) / 31536000)) ^ 31536000) - 1
  * This accounts for compound interest over a year
+ * Returns decimal format (0.4386 = 43.86% APY), not percentage (43.86)
  */
 function rayToPercent(rayValue: bigint): string {
   // Convert ray to decimal rate (rate / 10^27)
@@ -254,8 +255,8 @@ function rayToPercent(rayValue: bigint): string {
   // Apply annual compounding formula: (1 + rate/secondsPerYear)^secondsPerYear - 1
   const apy = (Math.pow(1 + decimalRate / SECONDS_PER_YEAR, SECONDS_PER_YEAR) - 1);
 
-  // Return as percentage string (multiply by 100 for percentage, but keep 6 decimals for precision)
-  return (apy * 100).toFixed(6);
+  // Return as decimal string (0.4386 = 43.86% APY)
+  return apy.toFixed(6);
 }
 
 /**
