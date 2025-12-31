@@ -21,7 +21,7 @@ const TOOLTIPS = {
   healthFactor: 'Ratio de securite de votre position. En dessous de 1.0, vous risquez la liquidation. Recommande: > 1.5 pour les debutants.',
   ltv: 'Loan-to-Value: pourcentage maximum que vous pouvez emprunter par rapport a votre collateral.',
   asset: 'La cryptomonnaie que vous utilisez comme collateral et pour emprunter.',
-  borrowPercentage: 'Pourcentage du maximum empruntable a utiliser a chaque cycle. 80% = emprunte 80% du max possible. Reduit le risque de liquidation en cas de depeg.',
+  borrowPercentage: 'Pourcentage de votre collateral que vous allez emprunter a chaque cycle. Limité au LTV maximum de l\'asset. Exemple: si LTV=72%, le max est 72%.',
 };
 
 const Calculator: FC = () => {
@@ -317,13 +317,16 @@ const Calculator: FC = () => {
             )}
           </div>
 
-          {/* Borrow Percentage - Protection against depeg */}
+          {/* Borrow Percentage - Locked at LTV */}
           <div className="input-group md:col-span-2">
             <label htmlFor="borrow-percentage" className="input-label">
               <Tooltip content={TOOLTIPS.borrowPercentage}>
-                Pourcentage d&apos;emprunt
+                % du collateral à emprunter
               </Tooltip>
-              <span className="ml-2 text-sm font-bold text-purple-400">{inputs.borrowPercentage}%</span>
+              <span className="ml-2 text-sm font-bold text-purple-400">
+                {inputs.borrowPercentage}%
+                {liveRates && ` / ${(parseFloat(liveRates.ltv) * 100).toFixed(0)}% (LTV Max)`}
+              </span>
             </label>
             <div className="relative mt-2">
               <input
@@ -331,32 +334,42 @@ const Calculator: FC = () => {
                 type="range"
                 className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
                 value={inputs.borrowPercentage}
-                onChange={(e) => handleInputChange('borrowPercentage', e.target.value)}
-                min="50"
-                max="100"
+                onChange={(e) => {
+                  const value = Math.min(parseFloat(e.target.value), liveRates ? parseFloat(liveRates.ltv) * 100 : 100);
+                  handleInputChange('borrowPercentage', value.toString());
+                }}
+                min="10"
+                max={liveRates ? Math.max(parseFloat(liveRates.ltv) * 100, 50).toString() : "100"}
                 step="5"
               />
               <div className="flex justify-between text-xs text-slate-500 mt-1">
-                <span>50% (Prudent)</span>
-                <span>75%</span>
-                <span>100% (Max)</span>
+                <span>10% (Prudent)</span>
+                <span>{liveRates ? `${(parseFloat(liveRates.ltv) * 50).toFixed(0)}%` : '50%'}</span>
+                <span>{liveRates ? `${(parseFloat(liveRates.ltv) * 100).toFixed(0)}% (LTV Max)` : '100% (Max)'}</span>
               </div>
             </div>
-            <div className="mt-2 flex items-center gap-1">
-              {[50, 60, 70, 80, 90, 100].map((pct) => (
-                <button
-                  key={pct}
-                  type="button"
-                  onClick={() => handleInputChange('borrowPercentage', pct.toString())}
-                  className={`flex-1 py-1.5 text-xs rounded-lg transition-all ${
-                    parseInt(inputs.borrowPercentage) === pct
-                      ? 'bg-purple-500 text-white'
-                      : 'bg-slate-700/50 text-slate-400 hover:bg-slate-700'
-                  }`}
-                >
-                  {pct}%
-                </button>
-              ))}
+            <div className="mt-2 flex items-center gap-1 flex-wrap">
+              {[10, 25, 50, 75].map((pct) => {
+                const maxBorrow = liveRates ? parseFloat(liveRates.ltv) * 100 : 100;
+                const isDisabled = pct > maxBorrow;
+                return (
+                  <button
+                    key={pct}
+                    type="button"
+                    onClick={() => handleInputChange('borrowPercentage', Math.min(pct, maxBorrow).toString())}
+                    disabled={isDisabled}
+                    className={`flex-1 py-1.5 text-xs rounded-lg transition-all ${
+                      parseInt(inputs.borrowPercentage) === pct
+                        ? 'bg-purple-500 text-white'
+                        : isDisabled
+                        ? 'bg-slate-800 text-slate-600 cursor-not-allowed'
+                        : 'bg-slate-700/50 text-slate-400 hover:bg-slate-700'
+                    }`}
+                  >
+                    {pct}%
+                  </button>
+                );
+              })}
             </div>
             <p className="mt-2 text-xs text-slate-500">
               {parseInt(inputs.borrowPercentage) <= 70

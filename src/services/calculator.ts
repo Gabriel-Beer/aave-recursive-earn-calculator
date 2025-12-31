@@ -30,11 +30,12 @@ export async function calculateRecursiveCycles(input: CalculationInput): Promise
   const initialAmountNum = parseFloat(initialAmount);
   const ltv = parseFloat(reserveData.ltv); // e.g., 0.80 = 80%
   const liquidationThreshold = parseFloat(reserveData.liquidationThreshold); // e.g., 0.85 = 85%
-  const supplyAPY = parseFloat(reserveData.liquidityRate); // Annual supply rate
-  const borrowAPY = parseFloat(reserveData.variableBorrowRate); // Annual borrow rate
+  const supplyAPY = parseFloat(reserveData.liquidityRate); // Annual supply rate (decimal, e.g., 0.4386 = 43.86%)
+  const borrowAPY = parseFloat(reserveData.variableBorrowRate); // Annual borrow rate (decimal)
 
-  // Effective borrow ratio per cycle
-  const effectiveLTV = ltv * borrowPercentage;
+  // Effective borrow ratio per cycle (borrowPercentage is already in decimal, e.g., 0.72 = 72% of collateral)
+  // This is directly the percentage of collateral to borrow, capped at LTV
+  const effectiveLTV = borrowPercentage;
 
   let totalCollateral = initialAmountNum;
   let totalDebt = 0;
