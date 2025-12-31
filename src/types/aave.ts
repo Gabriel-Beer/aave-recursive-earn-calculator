@@ -31,6 +31,7 @@ export interface RecursiveSimulation {
   totalBorrowed: string;
   totalInterestEarned: string;
   leverage: string;
+  maxLeverage: string; // Theoretical maximum leverage (1 / (1 - LTV))
   supplyAPY: string;
   borrowAPY: string;
   netAPY: string;

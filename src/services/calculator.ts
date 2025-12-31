@@ -33,6 +33,11 @@ export async function calculateRecursiveCycles(input: CalculationInput): Promise
   const supplyAPY = parseFloat(reserveData.liquidityRate); // Annual supply rate (decimal, e.g., 0.4386 = 43.86%)
   const borrowAPY = parseFloat(reserveData.variableBorrowRate); // Annual borrow rate (decimal)
 
+  // Calculate maximum theoretical leverage
+  // Formula: maxLeverage = 1 / (1 - LTV)
+  // Example: LTV 77% → maxLeverage = 1 / (1 - 0.77) = 4.35x
+  const maxTheoreticalLeverage = 1 / (1 - ltv);
+
   // Effective borrow ratio per cycle (borrowPercentage is already in decimal, e.g., 0.72 = 72% of collateral)
   // This is directly the percentage of collateral to borrow, capped at LTV
   const effectiveLTV = borrowPercentage;
@@ -89,6 +94,12 @@ export async function calculateRecursiveCycles(input: CalculationInput): Promise
   // Calculate leverage
   const leverage = totalCollateral / initialAmountNum;
 
+  // Calculate Net APY using official Aave formula
+  // Formula: netAPY = (supplyAPY × leverage) - (borrowAPY × (leverage - 1))
+  // This accounts for earning on total collateral and paying interest on net debt
+  const netAPYDecimal = (supplyAPY * leverage) - (borrowAPY * (leverage - 1));
+  const netAPYPercent = netAPYDecimal * 100;
+
   // Calculate annual interest (for reference)
   const annualSupplyInterest = totalCollateral * supplyAPY;
   const annualBorrowInterest = totalDebt * borrowAPY;
@@ -98,7 +109,9 @@ export async function calculateRecursiveCycles(input: CalculationInput): Promise
   const riskMetrics = calculateRiskMetrics(
     totalCollateral,
     totalDebt,
-    liquidationThreshold
+    liquidationThreshold,
+    maxTheoreticalLeverage,
+    initialAmountNum
   );
 
   return {
@@ -108,9 +121,10 @@ export async function calculateRecursiveCycles(input: CalculationInput): Promise
     totalBorrowed: totalDebt.toFixed(2),
     totalInterestEarned: netAnnualInterest.toFixed(2), // Net annual interest
     leverage: leverage.toFixed(2),
+    maxLeverage: maxTheoreticalLeverage.toFixed(2),
     supplyAPY: (supplyAPY * 100).toFixed(2),
     borrowAPY: (borrowAPY * 100).toFixed(2),
-    netAPY: ((netAnnualInterest / initialAmountNum) * 100).toFixed(2),
+    netAPY: netAPYPercent.toFixed(2),
     riskMetrics,
     progressionByRound,
   };
@@ -119,12 +133,17 @@ export async function calculateRecursiveCycles(input: CalculationInput): Promise
 function calculateRiskMetrics(
   totalCollateral: number,
   totalDebt: number,
-  liquidationThreshold: number
+  liquidationThreshold: number,
+  maxTheoreticalLeverage: number,
+  initialAmount: number
 ): RiskMetrics {
   // Health Factor = (Collateral * LT) / Debt
   const healthFactor = totalDebt > 0
     ? (totalCollateral * liquidationThreshold) / totalDebt
     : Infinity;
+
+  // Current leverage = totalCollateral / initialAmount
+  const currentLeverage = initialAmount > 0 ? totalCollateral / initialAmount : 1;
 
   // Liquidation price: at what % drop does HF = 1?
   // HF = (Collateral * priceDrop * LT) / Debt = 1
@@ -138,6 +157,12 @@ function calculateRiskMetrics(
 
   let riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' = 'LOW';
   const warningMessages: string[] = [];
+
+  // Check if leverage exceeds theoretical maximum
+  if (currentLeverage > maxTheoreticalLeverage * 0.95) {
+    warningMessages.push(`⚠️ Leverage très proche du max théorique (${currentLeverage.toFixed(2)}x / ${maxTheoreticalLeverage.toFixed(2)}x)`);
+    warningMessages.push('Toute augmentation de l\'utilisation pourrait causer une liquidation');
+  }
 
   if (healthFactor < 1.1) {
     riskLevel = 'CRITICAL';
