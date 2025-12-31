@@ -322,7 +322,33 @@ export async function getReserveData(assetSymbol: string): Promise<ReserveData> 
       liquidationThreshold,
       liquidationBonus,
       reserveFactor,
+      usageAsCollateralEnabled,
+      borrowingEnabled,
+      stableBorrowRateEnabled,
+      isActive,
+      isFrozen,
     ] = configData;
+
+    // Validate asset eligibility
+    const validationErrors: string[] = [];
+    if (!isActive) {
+      validationErrors.push(`❌ ${assetSymbol} n'est pas actif sur Aave V3`);
+    }
+    if (isFrozen) {
+      validationErrors.push(`❌ ${assetSymbol} est gelé (aucun dépôt/emprunt possible)`);
+    }
+    if (!usageAsCollateralEnabled) {
+      validationErrors.push(`❌ ${assetSymbol} ne peut pas être utilisé comme collateral`);
+    }
+    if (!borrowingEnabled) {
+      validationErrors.push(`❌ ${assetSymbol} n'est pas empruntable`);
+    }
+
+    if (validationErrors.length > 0) {
+      const errorMsg = validationErrors.join(' | ');
+      console.error(`⚠️ Erreur de configuration pour ${assetSymbol}: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
 
     // Calculate total liquidity (totalAToken represents total supplied)
     const totalLiquidity = totalAToken;
@@ -361,6 +387,13 @@ export async function getReserveData(assetSymbol: string): Promise<ReserveData> 
     console.log(`Reserve Factor: ${bpsToDecimal(reserveFactor)} (${(parseFloat(bpsToDecimal(reserveFactor)) * 100).toFixed(2)}%)`);
     console.log(`Decimals: ${Number(decimals)}`);
     console.log(`Last Update: ${new Date(Number(lastUpdateTimestamp) * 1000).toISOString()}`);
+    console.groupEnd();
+    console.group('🔐 Asset Status');
+    console.log(`Active: ${isActive ? '✅' : '❌'}`);
+    console.log(`Frozen: ${isFrozen ? '❌' : '✅'}`);
+    console.log(`Usable as Collateral: ${usageAsCollateralEnabled ? '✅' : '❌'}`);
+    console.log(`Borrowing Enabled: ${borrowingEnabled ? '✅' : '❌'}`);
+    console.log(`Stable Rate Borrowing: ${stableBorrowRateEnabled ? '✅' : '❌'}`);
     console.groupEnd();
     console.groupEnd();
 
