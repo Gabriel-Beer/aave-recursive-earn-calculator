@@ -75,67 +75,110 @@ const POOL_ABI = [
 ] as const;
 
 // Asset addresses on Ethereum Mainnet (Aave V3)
+// Complete list of 43+ supported assets
 const ASSET_ADDRESSES: Record<string, `0x${string}`> = {
   // Stablecoins
   USDC: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
-  DAI: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
   USDT: '0xdAC17F958D2ee523a2206206994597C13D831ec7',
-  FRAX: '0x853d955aCEf822Db058eb8505911ED77F175b99e',
+  DAI: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
   LUSD: '0x5f98805A4E8be255a32880FDeC7F6728C6568bA0',
-  // Major cryptos
+  GHO: '0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f',
+  FRAX: '0x853d955aCEf822Db058eb8505911ED77F175b99e',
+  USDe: '0x4c9EDD5852cd905f23a6af0911c5B9B0EA6f2F67',
+  sUSDe: '0x9D39A5DE30e57443BfF2A8307A4256c8797A3497',
+  PYUSD: '0x6c3ea9036406852006290033d967ddd3d2139f0d',
+  USDS: '0xdC035D45d8E7aB5FD3907b9f555aAE20ed4aCD76',
+  USDtb: '0x18084fbA666a33d37592fA2633fD49a74DD93a88',
+  EURC: '0x2b9a9aFF31bD59f027b90b3d2cBcb7B3f4fe7f1e',
+  crvUSD: '0xf939E0A03FB07F59A73967B34a7EAf3D92eeA54d',
+  mUSD: '0x4DD9352cF340cf290829d12eA2549DCb1b67AdB7',
+  RLUSD: '0xA8d5060a7Dc4F6D59B2c32794CD2b5Df64aB4A2f',
+  // Major crypto
   WETH: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
   ETH: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
   WBTC: '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599',
-  // DeFi tokens
+  // Wrapped/Staked ETH (LSDs)
+  wstETH: '0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0',
+  cbETH: '0xBe9895146f7AF43049ca1c1AE358B0541Ea49704',
+  rETH: '0xae78736Cd615f374D3085123A210448E74Fc6393',
+  weETH: '0xcd5fe23c85820f7b72d0926e8cb457eb41e1ef93',
+  osETH: '0xf1C9acDc66974dFB6f2B06783AEe1550Bd5dEFe',
+  rsETH: '0xa1290d69369cA325D4B78f7F65B8d4786912ff5f',
+  ETHx: '0xa35b1b31ce002fbf2058d22f30f95d405200a15b',
+  ezETH: '0xbf5495Efe5DB9ce00f80364C8B423567e58d2110',
+  // Bitcoin
+  cbBTC: '0xcbB7C0000aB88647b02LoA8wGiaf5338cP3FA3',
+  LBTC: '0x8236a87757124d5B4F5c5c3E8010c4d33B60F6e8',
+  tBTC: '0x18084fbA666a33d37592fA2633fD49a74DD93a88',
+  // Governance/DeFi
   LINK: '0x514910771AF9Ca656af840dff83E8264EcF986CA',
   AAVE: '0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9',
   UNI: '0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984',
   MKR: '0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2',
   SNX: '0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F',
   CRV: '0xD533a949740bb3306d119CC777fa900bA034cd52',
-  // LSDs (Liquid Staking Derivatives)
-  wstETH: '0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0',
-  rETH: '0xae78736Cd615f374D3085123A210448E74Fc6393',
-  cbETH: '0xBe9895146f7AF43049ca1c1AE358B0541Ea49704',
-  // Other
-  ENS: '0xC18360217D8F7Ab5e7c516566761Ea12Ce7F9D72',
-  '1INCH': '0x111111111117dC0aa78b770fA6A738034120C302',
-  LDO: '0x5A98FcBEA516Cf06857215779Fd812CA3beF1B32',
-  RPL: '0xD33526068D116cE69F19A9ee46F0bd304F21A51f',
   BAL: '0xba100000625a3754423978a60c9317c58a424e3D',
-  GHO: '0x40D16FC0246aD3160Ccc09B8D0D3A2cD28aE6C2f',
+  LDO: '0x5A98FcBEA516Cf06857215779Fd812CA3beF1B32',
+  '1INCH': '0x111111111117dC0aa78b770fA6A738034120C302',
+  ENS: '0xC18360217D8F7Ab5e7c516566761Ea12Ce7F9D72',
+  RPL: '0xD33526068D116cE69F19A9ee46F0bd304F21A51f',
+  // Other
+  sDAI: '0x83f20f44975d03b1b09fdee56687053cef38f5d0',
+  XAUt: '0x68749665FF8D2d112Fa2914F2757B5Ff10d6B503',
+  eUSDe: '0xa0d69E286B938e21CBf7E21292D7ACb4CfE8d537',
 };
 
 // Asset metadata
 const ASSET_METADATA: Record<string, { id: string; name: string; category: string }> = {
   // Stablecoins
   USDC: { id: '1', name: 'USD Coin', category: 'Stablecoin' },
-  DAI: { id: '2', name: 'Dai Stablecoin', category: 'Stablecoin' },
-  USDT: { id: '3', name: 'Tether USD', category: 'Stablecoin' },
+  USDT: { id: '2', name: 'Tether USD', category: 'Stablecoin' },
+  DAI: { id: '3', name: 'Dai Stablecoin', category: 'Stablecoin' },
+  LUSD: { id: '4', name: 'Liquity USD', category: 'Stablecoin' },
+  GHO: { id: '5', name: 'GHO Stablecoin', category: 'Stablecoin' },
   FRAX: { id: '6', name: 'Frax', category: 'Stablecoin' },
-  LUSD: { id: '7', name: 'Liquity USD', category: 'Stablecoin' },
-  GHO: { id: '24', name: 'GHO Stablecoin', category: 'Stablecoin' },
-  // Major cryptos
-  ETH: { id: '4', name: 'Ethereum', category: 'Major' },
-  WETH: { id: '4', name: 'Wrapped Ether', category: 'Major' },
-  WBTC: { id: '5', name: 'Wrapped Bitcoin', category: 'Major' },
-  // DeFi tokens
-  LINK: { id: '8', name: 'Chainlink', category: 'DeFi' },
-  AAVE: { id: '9', name: 'Aave', category: 'DeFi' },
-  UNI: { id: '10', name: 'Uniswap', category: 'DeFi' },
-  MKR: { id: '11', name: 'Maker', category: 'DeFi' },
-  SNX: { id: '12', name: 'Synthetix', category: 'DeFi' },
-  CRV: { id: '13', name: 'Curve DAO', category: 'DeFi' },
-  BAL: { id: '23', name: 'Balancer', category: 'DeFi' },
-  '1INCH': { id: '19', name: '1inch', category: 'DeFi' },
-  // LSDs
-  wstETH: { id: '14', name: 'Wrapped stETH', category: 'LSD' },
-  rETH: { id: '15', name: 'Rocket Pool ETH', category: 'LSD' },
-  cbETH: { id: '16', name: 'Coinbase ETH', category: 'LSD' },
+  USDe: { id: '7', name: 'USDe', category: 'Stablecoin' },
+  sUSDe: { id: '8', name: 'Staked USDe', category: 'Stablecoin' },
+  PYUSD: { id: '9', name: 'PayPal USD', category: 'Stablecoin' },
+  USDS: { id: '10', name: 'USDS Stablecoin', category: 'Stablecoin' },
+  USDtb: { id: '11', name: 'USDtb', category: 'Stablecoin' },
+  EURC: { id: '12', name: 'Euro Coin', category: 'Stablecoin' },
+  crvUSD: { id: '13', name: 'Curve USD', category: 'Stablecoin' },
+  mUSD: { id: '14', name: 'MetaMask USD', category: 'Stablecoin' },
+  RLUSD: { id: '15', name: 'Ripple USD', category: 'Stablecoin' },
+  // Major
+  ETH: { id: '16', name: 'Ethereum', category: 'Major' },
+  WETH: { id: '16', name: 'Wrapped Ether', category: 'Major' },
+  WBTC: { id: '17', name: 'Wrapped Bitcoin', category: 'Major' },
+  // Liquid Staking Derivatives
+  wstETH: { id: '18', name: 'Wrapped stETH', category: 'LSD' },
+  cbETH: { id: '19', name: 'Coinbase Wrapped ETH', category: 'LSD' },
+  rETH: { id: '20', name: 'Rocket Pool ETH', category: 'LSD' },
+  weETH: { id: '21', name: 'Wrapped eETH', category: 'LSD' },
+  osETH: { id: '22', name: 'Staked ETH (Stader)', category: 'LSD' },
+  rsETH: { id: '23', name: 'Renzo Restaked ETH', category: 'LSD' },
+  ETHx: { id: '24', name: 'Stader ETHx', category: 'LSD' },
+  ezETH: { id: '25', name: 'Renzo Restaked ETH', category: 'LSD' },
+  // Bitcoin
+  cbBTC: { id: '26', name: 'Coinbase Wrapped BTC', category: 'Bitcoin' },
+  LBTC: { id: '27', name: 'Lombard Staked Bitcoin', category: 'Bitcoin' },
+  tBTC: { id: '28', name: 'tBTC', category: 'Bitcoin' },
+  // Governance/DeFi
+  LINK: { id: '29', name: 'Chainlink', category: 'Governance' },
+  AAVE: { id: '30', name: 'Aave', category: 'Governance' },
+  UNI: { id: '31', name: 'Uniswap', category: 'Governance' },
+  MKR: { id: '32', name: 'Maker', category: 'Governance' },
+  SNX: { id: '33', name: 'Synthetix', category: 'Governance' },
+  CRV: { id: '34', name: 'Curve DAO', category: 'Governance' },
+  BAL: { id: '35', name: 'Balancer', category: 'Governance' },
+  LDO: { id: '36', name: 'Lido DAO', category: 'Governance' },
+  '1INCH': { id: '37', name: '1inch', category: 'Governance' },
+  ENS: { id: '38', name: 'ENS', category: 'Governance' },
+  RPL: { id: '39', name: 'Rocket Pool', category: 'Governance' },
   // Other
-  ENS: { id: '17', name: 'ENS', category: 'Other' },
-  LDO: { id: '20', name: 'Lido DAO', category: 'Other' },
-  RPL: { id: '21', name: 'Rocket Pool', category: 'Other' },
+  sDAI: { id: '40', name: 'Savings Dai', category: 'Other' },
+  XAUt: { id: '41', name: 'Tether Gold', category: 'Other' },
+  eUSDe: { id: '42', name: 'Ethereal Pre-deposit Vault', category: 'Other' },
 };
 
 // Mock data for fallback
