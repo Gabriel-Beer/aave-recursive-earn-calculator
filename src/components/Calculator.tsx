@@ -2,7 +2,9 @@ import { FC, useState, useEffect, useMemo, useCallback } from 'react';
 import { calculateRecursiveCycles } from '@/services/calculator';
 import { getReserveData, getSupportedAssets } from '@/services/aaveService';
 import { RecursiveSimulation, ReserveData } from '@/types/aave';
+import { useCustomAssets } from '@/hooks/useCustomAssets';
 import ResultsDisplay from './ResultsDisplay';
+import { CustomAssetsDrawer } from './CustomAssets/CustomAssetsDrawer';
 import Tooltip from './Tooltip';
 
 type CalculationMode = 'cycles' | 'healthFactor';
@@ -25,6 +27,7 @@ const TOOLTIPS = {
 };
 
 const Calculator: FC = () => {
+  const { isCustomSymbol, hasOverride, assets: customAssets } = useCustomAssets();
   const [calculationMode, setCalculationMode] = useState<CalculationMode>('cycles');
   const [inputs, setInputs] = useState<CalculatorInputs>({
     initialAmount: '1000',
@@ -39,9 +42,16 @@ const Calculator: FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [liveRates, setLiveRates] = useState<ReserveData | null>(null);
   const [loadingRates, setLoadingRates] = useState(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
 
-  // Get all supported assets grouped by category
-  const supportedAssets = useMemo(() => getSupportedAssets(), []);
+  // Only refresh supported assets after hydration (client-side)
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
+
+  // Get all supported assets grouped by category - only includes custom assets after hydration
+  const supportedAssets = useMemo(() => getSupportedAssets(), [customAssets]);
   const assetsByCategory = useMemo(() => {
     const grouped: Record<string, typeof supportedAssets> = {};
     supportedAssets.forEach(asset => {
@@ -163,12 +173,25 @@ const Calculator: FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Custom Assets Drawer */}
+      <CustomAssetsDrawer isOpen={isDrawerOpen} onClose={() => setIsDrawerOpen(false)} />
+
       {/* Input Section */}
       <div className="card-elevated">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
             Parametres de simulation
           </h2>
+          <button
+            onClick={() => setIsDrawerOpen(true)}
+            className="px-4 py-2 text-sm font-medium bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors flex items-center gap-2"
+            title="Manage custom assets and promotional rates"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Custom Assets
+          </button>
         </div>
 
         {/* Mode Toggle */}
@@ -260,6 +283,18 @@ const Calculator: FC = () => {
               value={inputs.assetSymbol}
               onChange={(e) => handleInputChange('assetSymbol', e.target.value)}
             >
+              {/* Custom Assets at top if any exist */}
+              {supportedAssets.some(a => a.isCustom) && (
+                <optgroup label="🟣 Custom Assets">
+                  {supportedAssets.filter(a => a.isCustom).map((asset) => (
+                    <option key={asset.symbol} value={asset.symbol}>
+                      {asset.symbol} - {asset.name}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+
+              {/* Live Assets */}
               {Object.entries(assetsByCategory).map(([category, assets]) => (
                 <optgroup key={category} label={category === 'LSD' ? 'Liquid Staking' : category}>
                   {assets.map((asset) => (
@@ -313,6 +348,28 @@ const Calculator: FC = () => {
             ) : (
               <div className="text-sm text-slate-500 py-3">
                 Impossible de charger les taux
+              </div>
+            )}
+
+            {/* Data Source Indicator */}
+            {liveRates && (
+              <div className="mt-3 text-xs flex items-center gap-2">
+                {isCustomSymbol(inputs.assetSymbol) ? (
+                  <>
+                    <span className="w-2 h-2 rounded-full bg-purple-400" />
+                    <span className="text-purple-300">Asset personnalisé (données manuelles)</span>
+                  </>
+                ) : hasOverride(inputs.assetSymbol) ? (
+                  <>
+                    <span className="w-2 h-2 rounded-full bg-yellow-400" />
+                    <span className="text-yellow-300">Taux personnalisés appliqués</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="w-2 h-2 rounded-full bg-green-400" />
+                    <span className="text-green-300">Taux en direct depuis Aave V3</span>
+                  </>
+                )}
               </div>
             )}
           </div>

@@ -1,6 +1,7 @@
 import { ReserveData, UserAccountData } from '@/types/aave';
 import { createPublicClient, http, formatUnits } from 'viem';
 import { mainnet } from 'viem/chains';
+import { getCustomAssetBySymbol, getCustomAssets } from './customAssetsService';
 
 // AAVE V3 Pool Data Provider Address on Ethereum Mainnet
 const AAVE_POOL_DATA_PROVIDER = '0x7B4EB56E7CD4b454BA8ff71E4518426369a138a3';
@@ -129,7 +130,7 @@ const ASSET_ADDRESSES: Record<string, `0x${string}`> = {
 };
 
 // Asset metadata
-const ASSET_METADATA: Record<string, { id: string; name: string; category: string }> = {
+export const ASSET_METADATA: Record<string, { id: string; name: string; category: string }> = {
   // Stablecoins
   USDC: { id: '1', name: 'USD Coin', category: 'Stablecoin' },
   USDT: { id: '2', name: 'Tether USD', category: 'Stablecoin' },
@@ -309,11 +310,71 @@ function bpsToDecimal(bps: bigint): string {
   return (Number(bps) / 10000).toFixed(4);
 }
 
+/**
+ * Converts a custom asset to ReserveData format
+ */
+function customAssetToReserveData(assetSymbol: string, customAsset: ReturnType<typeof getCustomAssetBySymbol>): ReserveData {
+  if (!customAsset) {
+    return MOCK_RATES[assetSymbol] || MOCK_RATES['USDC'];
+  }
+
+  const decimals = customAsset.decimals || 18;
+  const supplyAPY = customAsset.liquidityRate || '0.03'; // 3% default
+  const borrowAPY = customAsset.variableBorrowRate || '0.025'; // 2.5% default
+  const stableBorrowAPY = customAsset.stableBorrowRate || '0.03'; // 3% default
+
+  console.group(`📊 Custom Asset Data - ${assetSymbol}`);
+  console.log(`🟣 Type: ${customAsset.type === 'custom' ? 'New Asset' : 'Override Rates'}`);
+  console.log(`Name: ${customAsset.name}`);
+  console.group('📈 Rates (APY)');
+  console.log(`Supply APY: ${supplyAPY} (${(parseFloat(supplyAPY) * 100).toFixed(2)}%)`);
+  console.log(`Borrow APY: ${borrowAPY} (${(parseFloat(borrowAPY) * 100).toFixed(2)}%)`);
+  console.log(`Stable Borrow APY: ${stableBorrowAPY} (${(parseFloat(stableBorrowAPY) * 100).toFixed(2)}%)`);
+  console.groupEnd();
+  console.group('⚙️ Configuration');
+  console.log(`LTV: ${(parseFloat(customAsset.ltv) * 100).toFixed(2)}%`);
+  console.log(`Liquidation Threshold: ${(parseFloat(customAsset.liquidationThreshold) * 100).toFixed(2)}%`);
+  console.log(`Decimals: ${decimals}`);
+  if (customAsset.notes) {
+    console.log(`Notes: ${customAsset.notes}`);
+  }
+  console.groupEnd();
+  console.groupEnd();
+
+  return {
+    id: `custom-${customAsset.id}`,
+    symbol: assetSymbol,
+    name: customAsset.name,
+    decimals,
+    totalLiquidity: '0', // Custom assets don't have on-chain liquidity
+    utilizationRate: '0',
+    variableBorrowRate: borrowAPY,
+    stableBorrowRate: stableBorrowAPY,
+    liquidityRate: supplyAPY,
+    reserveFactor: '0.1',
+    ltv: customAsset.ltv,
+    liquidationThreshold: customAsset.liquidationThreshold,
+    liquidationBonus: customAsset.liquidationBonus || '0.05',
+    lastUpdateTimestamp: customAsset.updatedAt,
+  };
+}
+
 export async function getReserveData(assetSymbol: string): Promise<ReserveData> {
+  // Check custom assets first
+  const customAsset = getCustomAssetBySymbol(assetSymbol);
+  if (customAsset && customAsset.type === 'custom') {
+    // Fully custom asset - use custom data entirely
+    return customAssetToReserveData(assetSymbol, customAsset);
+  }
+
   const assetAddress = ASSET_ADDRESSES[assetSymbol];
   const metadata = ASSET_METADATA[assetSymbol];
 
   if (!assetAddress || !metadata) {
+    // Check if it's a custom override without live data
+    if (customAsset && customAsset.type === 'override') {
+      return customAssetToReserveData(assetSymbol, customAsset);
+    }
     console.warn(`Unknown asset symbol: ${assetSymbol}, falling back to mock data`);
     return MOCK_RATES[assetSymbol] || MOCK_RATES['USDC'];
   }
@@ -440,7 +501,7 @@ export async function getReserveData(assetSymbol: string): Promise<ReserveData> 
     console.groupEnd();
     console.groupEnd();
 
-    return {
+    const liveData: ReserveData = {
       id: metadata.id,
       symbol: assetSymbol,
       name: metadata.name,
@@ -457,6 +518,23 @@ export async function getReserveData(assetSymbol: string): Promise<ReserveData> 
       liquidationBonus: ((Number(liquidationBonus) - 10000) / 10000).toFixed(4),
       lastUpdateTimestamp: Number(lastUpdateTimestamp) * 1000, // Convert to milliseconds
     };
+
+    // If there's a custom override, merge the overridden fields
+    if (customAsset && customAsset.type === 'override') {
+      console.log(`📝 Applying custom rate overrides for ${assetSymbol}`);
+      return {
+        ...liveData,
+        // Override only provided fields
+        ...(customAsset.liquidityRate && { liquidityRate: customAsset.liquidityRate }),
+        ...(customAsset.variableBorrowRate && { variableBorrowRate: customAsset.variableBorrowRate }),
+        ...(customAsset.stableBorrowRate && { stableBorrowRate: customAsset.stableBorrowRate }),
+        ...(customAsset.ltv && { ltv: customAsset.ltv }),
+        ...(customAsset.liquidationThreshold && { liquidationThreshold: customAsset.liquidationThreshold }),
+        ...(customAsset.liquidationBonus && { liquidationBonus: customAsset.liquidationBonus }),
+      };
+    }
+
+    return liveData;
   } catch (error) {
     console.error(`Error fetching reserve data for ${assetSymbol}:`, error);
     console.warn(`Falling back to mock data for ${assetSymbol}`);
@@ -563,28 +641,41 @@ export async function getMultipleReserveData(symbols: string[]): Promise<Record<
 
 /**
  * Returns list of all supported assets grouped by category
+ * Includes both live assets and custom assets
  */
-export function getSupportedAssets(): { symbol: string; name: string; category: string }[] {
-  return Object.entries(ASSET_METADATA)
+export function getSupportedAssets(): { symbol: string; name: string; category: string; isCustom?: boolean }[] {
+  const liveAssets = Object.entries(ASSET_METADATA)
     .filter(([symbol]) => symbol !== 'WETH') // Hide WETH duplicate, use ETH instead
     .map(([symbol, meta]) => ({
       symbol,
       name: meta.name,
       category: meta.category,
-    }))
-    .sort((a, b) => {
-      // Sort by category order, then alphabetically
-      const categoryOrder: Record<string, number> = {
-        'Stablecoin': 1,
-        'Major': 2,
-        'LSD': 3,
-        'DeFi': 4,
-        'Other': 5
-      };
-      const catDiff = (categoryOrder[a.category] || 99) - (categoryOrder[b.category] || 99);
-      if (catDiff !== 0) return catDiff;
-      return a.symbol.localeCompare(b.symbol);
-    });
+    }));
+
+  // Add custom assets
+  const customAssets = getCustomAssets();
+  const customAssetsList = customAssets.map((asset) => ({
+    symbol: asset.symbol,
+    name: asset.type === 'override' ? `${asset.name} (Custom)` : asset.name,
+    category: asset.category || 'Other',
+    isCustom: true,
+  }));
+
+  // Combine and sort
+  return [...customAssetsList, ...liveAssets].sort((a, b) => {
+    // Sort by category order, then alphabetically
+    const categoryOrder: Record<string, number> = {
+      'Custom': 0,
+      'Stablecoin': 1,
+      'Major': 2,
+      'LSD': 3,
+      'DeFi': 4,
+      'Other': 5,
+    };
+    const catDiff = (categoryOrder[a.category] || 99) - (categoryOrder[b.category] || 99);
+    if (catDiff !== 0) return catDiff;
+    return a.symbol.localeCompare(b.symbol);
+  });
 }
 
 /**
