@@ -1,6 +1,6 @@
 import { FC, useState, useEffect, useMemo, useCallback } from 'react';
 import { calculateRecursiveCycles } from '@/services/calculator';
-import { getReserveData, getSupportedAssets } from '@/services/aaveService';
+import { getReserveData, ASSET_METADATA } from '@/services/aaveService';
 import { RecursiveSimulation, ReserveData } from '@/types/aave';
 import { useCustomAssets } from '@/hooks/useCustomAssets';
 import ResultsDisplay from './ResultsDisplay';
@@ -50,18 +50,28 @@ const Calculator: FC = () => {
     setIsHydrated(true);
   }, []);
 
-  // Get all supported assets grouped by category - only includes custom assets after hydration
-  const supportedAssets = useMemo(() => getSupportedAssets(), [customAssets]);
+  // Get live assets (always the same on server/client)
+  const liveAssets = useMemo(() => {
+    return Object.entries(ASSET_METADATA)
+      .filter(([symbol]) => symbol !== 'WETH')
+      .map(([symbol, meta]) => ({
+        symbol,
+        name: meta.name,
+        category: meta.category,
+      }));
+  }, []);
+
+  // Group live assets by category
   const assetsByCategory = useMemo(() => {
-    const grouped: Record<string, typeof supportedAssets> = {};
-    supportedAssets.forEach(asset => {
+    const grouped: Record<string, typeof liveAssets> = {};
+    liveAssets.forEach(asset => {
       if (!grouped[asset.category]) {
         grouped[asset.category] = [];
       }
       grouped[asset.category].push(asset);
     });
     return grouped;
-  }, [supportedAssets]);
+  }, [liveAssets]);
 
   // Fetch live rates when asset changes
   const fetchLiveRates = useCallback(async (symbol: string) => {
@@ -123,7 +133,10 @@ const Calculator: FC = () => {
       }
     }
 
-    if (!supportedAssets.some(a => a.symbol === inputs.assetSymbol)) {
+    // Check if asset exists in live assets or custom assets
+    const isValidAsset = liveAssets.some(a => a.symbol === inputs.assetSymbol) ||
+                         customAssets.some(a => a.symbol === inputs.assetSymbol);
+    if (!isValidAsset) {
       return 'Asset invalide';
     }
 
@@ -282,19 +295,20 @@ const Calculator: FC = () => {
               className="input-field"
               value={inputs.assetSymbol}
               onChange={(e) => handleInputChange('assetSymbol', e.target.value)}
+              suppressHydrationWarning
             >
-              {/* Custom Assets at top if any exist */}
-              {supportedAssets.some(a => a.isCustom) && (
+              {/* Custom Assets at top if any exist (only rendered after hydration) */}
+              {isHydrated && customAssets.length > 0 && (
                 <optgroup label="🟣 Custom Assets">
-                  {supportedAssets.filter(a => a.isCustom).map((asset) => (
-                    <option key={asset.symbol} value={asset.symbol}>
+                  {customAssets.map((asset) => (
+                    <option key={asset.id} value={asset.symbol}>
                       {asset.symbol} - {asset.name}
                     </option>
                   ))}
                 </optgroup>
               )}
 
-              {/* Live Assets */}
+              {/* Live Assets (always rendered consistently) */}
               {Object.entries(assetsByCategory).map(([category, assets]) => (
                 <optgroup key={category} label={category === 'LSD' ? 'Liquid Staking' : category}>
                   {assets.map((asset) => (
