@@ -8,6 +8,116 @@ interface CalculationInput {
   targetHealthFactor: number;
   borrowPercentage: number; // 0.5 to 1.0 (50% to 100% of max borrow)
   mode: 'cycles' | 'healthFactor';
+  autoReinvest?: 'true' | 'false';
+  harvestFrequencyType?: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'custom';
+  customHarvestDays?: string;
+}
+
+interface CompoundingConfig {
+  enabled: boolean;
+  periodsPerYear: number; // 365 (daily), 52 (weekly), 12 (monthly), 4 (quarterly), or custom
+}
+
+/**
+ * Calculate compound interest for a given time period
+ * Formula: A = P * (1 + r/n)^(n*t)
+ * Where:
+ *   P = principal (initial collateral/debt)
+ *   r = annual rate (APY)
+ *   n = compounding periods per year
+ *   t = time in years
+ */
+function calculateCompoundInterest(
+  principal: number,
+  annualRate: number,
+  periodsPerYear: number,
+  timeYears: number
+): number {
+  if (periodsPerYear === 0) {
+    // Simple interest fallback
+    return principal * annualRate * timeYears;
+  }
+
+  const ratePerPeriod = annualRate / periodsPerYear;
+  const totalPeriods = periodsPerYear * timeYears;
+  const finalAmount = principal * Math.pow(1 + ratePerPeriod, totalPeriods);
+  return finalAmount - principal; // Return just the interest earned
+}
+
+/**
+ * Calculate net interest with compounding
+ */
+function calculateNetCompoundInterest(
+  totalCollateral: number,
+  totalDebt: number,
+  supplyAPY: number,
+  borrowAPY: number,
+  compounding: CompoundingConfig,
+  timeYears: number
+): number {
+  if (!compounding.enabled) {
+    // Simple interest (current behavior)
+    const annualSupply = totalCollateral * supplyAPY;
+    const annualBorrow = totalDebt * borrowAPY;
+    return (annualSupply - annualBorrow) * timeYears;
+  }
+
+  // Compound interest
+  const supplyInterest = calculateCompoundInterest(
+    totalCollateral,
+    supplyAPY,
+    compounding.periodsPerYear,
+    timeYears
+  );
+
+  const borrowInterest = calculateCompoundInterest(
+    totalDebt,
+    borrowAPY,
+    compounding.periodsPerYear,
+    timeYears
+  );
+
+  return supplyInterest - borrowInterest;
+}
+
+/**
+ * Get periods per year based on harvest frequency type
+ */
+function getPeriodsPerYear(type?: string, customDays?: string): number {
+  switch (type) {
+    case 'daily':
+      return 365;
+    case 'weekly':
+      return 52;
+    case 'monthly':
+      return 12;
+    case 'quarterly':
+      return 4;
+    case 'custom':
+      return Math.floor(365 / parseInt(customDays || '30'));
+    default:
+      return 12;
+  }
+}
+
+/**
+ * Get human-readable frequency label
+ */
+function getFrequencyLabel(type?: string, customDays?: string): string {
+  switch (type) {
+    case 'daily':
+      return 'Quotidien';
+    case 'weekly':
+      return 'Hebdomadaire';
+    case 'monthly':
+      return 'Mensuel';
+    case 'quarterly':
+      return 'Trimestriel';
+    case 'custom':
+      return `Tous les ${customDays} jours`;
+    default:
+      return 'Mensuel';
+  }
 }
 
 /**
@@ -105,6 +215,41 @@ export async function calculateRecursiveCycles(input: CalculationInput): Promise
   const annualBorrowInterest = totalDebt * borrowAPY;
   const netAnnualInterest = annualSupplyInterest - annualBorrowInterest;
 
+  // Parse compounding config
+  const compoundingConfig: CompoundingConfig = {
+    enabled: input.autoReinvest === 'true',
+    periodsPerYear: getPeriodsPerYear(input.harvestFrequencyType, input.customHarvestDays),
+  };
+
+  // Calculate time projections with compound interest
+  const timeProjections = [
+    { period: '1 mois', months: 1 },
+    { period: '3 mois', months: 3 },
+    { period: '6 mois', months: 6 },
+    { period: '1 an', months: 12 },
+    { period: '2 ans', months: 24 },
+  ].map(({ period, months }) => {
+    const timeYears = months / 12;
+
+    const interestSimple = (annualSupplyInterest - annualBorrowInterest) * timeYears;
+    const interestCompound = calculateNetCompoundInterest(
+      totalCollateral,
+      totalDebt,
+      supplyAPY,
+      borrowAPY,
+      compoundingConfig,
+      timeYears
+    );
+
+    return {
+      period,
+      months,
+      interestSimple: interestSimple.toFixed(2),
+      interestCompound: interestCompound.toFixed(2),
+      totalValueCompound: (totalCollateral + interestCompound - totalDebt).toFixed(2),
+    };
+  });
+
   // Calculate risk metrics
   const riskMetrics = calculateRiskMetrics(
     totalCollateral,
@@ -127,6 +272,12 @@ export async function calculateRecursiveCycles(input: CalculationInput): Promise
     netAPY: netAPYPercent.toFixed(2),
     riskMetrics,
     progressionByRound,
+    compoundingConfig: {
+      enabled: compoundingConfig.enabled,
+      periodsPerYear: compoundingConfig.periodsPerYear,
+      frequencyLabel: getFrequencyLabel(input.harvestFrequencyType, input.customHarvestDays),
+    },
+    timeProjections,
   };
 }
 

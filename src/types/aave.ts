@@ -24,6 +24,20 @@ export interface UserAccountData {
   healthFactor: string;
 }
 
+export interface TimeProjection {
+  period: string;
+  months: number;
+  interestSimple: string;
+  interestCompound: string;
+  totalValueCompound: string;
+}
+
+export interface CompoundingConfig {
+  enabled: boolean;
+  periodsPerYear: number;
+  frequencyLabel: string;
+}
+
 export interface RecursiveSimulation {
   cycles: number;
   initialAmount: string;
@@ -37,6 +51,8 @@ export interface RecursiveSimulation {
   netAPY: string;
   riskMetrics: RiskMetrics;
   progressionByRound: RoundProgress[];
+  compoundingConfig: CompoundingConfig;
+  timeProjections: TimeProjection[];
 }
 
 export interface RiskMetrics {

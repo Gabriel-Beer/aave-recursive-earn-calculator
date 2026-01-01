@@ -33,15 +33,34 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
      - `getReserveData(symbol)` - Fetches on-chain APY rates, converts RAY format (10^27) → decimal
      - `getSupportedAssets()` - Returns 22+ cryptos grouped by category (Stablecoin, DeFi, LSD, etc.)
      - Falls back to MOCK_RATES if RPC fails
-   - `calculator.ts` - Core recursive lending simulation
-     - `calculateRecursiveCycles()` - Main algorithm: each cycle borrows on NEW deposited amount
+   - `calculator.ts` - Core recursive lending simulation & compound interest
+     - `calculateRecursiveCycles()` - Main algorithm with support for simple and compound interest
+     - `calculateCompoundInterest()` - Compound formula: A = P × (1 + r/n)^(n×t)
      - Two modes: fixed cycles or until target Health Factor
-     - Returns leverage, APY net, liquidation risk metrics
+     - Returns leverage, net APY, liquidation risk metrics, time projections
+   - `chartDataGenerator.ts` - Generates time-series data for visualizations
+     - `generateCompoundGrowthChart()` - Simple vs compound interest over 5 years
+     - `generateMonthlyProjections()` - Monthly position value evolution
+     - `generatePositionEvolutionChart()` - Collateral and debt progression by cycle
+   - `customAssetsService.ts` - Client-side asset management (localStorage)
+     - `saveCustomAsset()`, `updateCustomAsset()`, `deleteCustomAsset()` - CRUD operations
+     - `validateCustomAsset()` - Validates symbol, rates, LTV, liquidation threshold
+     - Stores up to 50 custom assets locally with version control
 
 4. **Types** (`src/types/aave.ts`)
    - `ReserveData` - Supply/borrow APY, LTV, liquidation threshold from Aave
-   - `RecursiveSimulation` - Final results: collateral, debt, APY net, progression by round
+   - `RecursiveSimulation` - Final results including:
+     - collateral, debt, APY net, progression by round
+     - `compoundingConfig` - Enabled flag, periods per year, frequency label
+     - `timeProjections` - Array of TimeProjection for 1m, 3m, 6m, 1y, 2y
+   - `TimeProjection` - Time-based projection data:
+     - period, months, interestSimple, interestCompound, totalValueCompound
+   - `CompoundingConfig` - Compounding settings:
+     - enabled, periodsPerYear, frequencyLabel
    - `RiskMetrics` - Health factor, price drop %, risk level (LOW/MEDIUM/HIGH/CRITICAL)
+   - `CustomAsset` - User-defined cryptocurrency:
+     - id, type (custom|override), symbol, name, category
+     - rates (liquidityRate, variableBorrowRate), risk params (ltv, liquidationThreshold)
 
 ## Key Formulas & Logic
 
@@ -62,6 +81,26 @@ Cycle N:
 ### Net APY
 ```
 Net APY = ((Supply Rate × Collateral) - (Borrow Rate × Debt)) / Initial Amount
+```
+
+### Compound Interest Calculation
+```
+Simple Interest (Linear):
+  Interest = Principal × Annual Rate × Time (in years)
+
+Compound Interest (Exponential):
+  A = P × (1 + r/n)^(n×t)
+  Interest = A - P
+
+  Where:
+    P = Principal (collateral or debt)
+    r = Annual rate (APY as decimal)
+    n = Compounding periods per year (365=daily, 52=weekly, 12=monthly, 4=quarterly, or custom)
+    t = Time in years
+
+Supply Interest = Compound(totalCollateral, supplyAPY, n, t)
+Borrow Interest = Compound(totalDebt, borrowAPY, n, t)
+Net Interest = Supply Interest - Borrow Interest
 ```
 
 ## Development Commands
@@ -105,6 +144,20 @@ npm start
 - Assets grouped by category (Stablecoin, Major, LSD, DeFi, Other)
 - Adding new assets: add address to `ASSET_ADDRESSES` and metadata to `ASSET_METADATA` in `aaveService.ts`
 
+### Custom Assets Management
+- Users can add custom cryptocurrencies or override rates via `/CustomAssets/CustomAssetsDrawer.tsx`
+- Data stored in browser localStorage (5-10MB limit)
+- Each asset has: symbol, name, category, LTV, liquidation threshold, supply/borrow APY, optional address/decimals
+- Validation rules:
+  - Symbol: 2-10 uppercase alphanumeric, must be unique
+  - LTV: 0-100%, must be < Liquidation Threshold
+  - Rates: -1000% to 1000% (supports negative for incentivized borrowing)
+- Supports two types:
+  - **custom**: Brand new cryptocurrency not in Aave
+  - **override**: Live Aave asset but with custom promotional rates
+- Max 50 custom assets per user
+- Uses UUID for unique identification, timestamps for created/updated
+
 ### Build Quirks
 - Webpack fallback for `fs`, `path`, `crypto` modules (browser environment)
 - ConnectKit integration requires @tanstack/react-query as peer dependency
@@ -118,23 +171,55 @@ npm start
 
 ## Common Tasks
 
-### Adding a New Cryptocurrency
+### Adding a New Cryptocurrency (Live Aave Asset)
 1. Find Ethereum mainnet address (etherscan.io)
 2. Update `ASSET_ADDRESSES` object in `src/services/aaveService.ts`
 3. Update `ASSET_METADATA` with name and category
 4. Asset will automatically fetch live rates from Aave
 
+### Adding a Custom Asset or Override Rate
+1. Click "Custom Assets" button in the calculator
+2. Choose: New Asset (custom) or Override Rates (existing Aave asset)
+3. Fill form: symbol, name, category, LTV, liquidation threshold, rates
+4. Form validates in real-time; submit button enabled when valid
+5. Asset saved to localStorage and appears in dropdown on next calculation
+6. Custom assets display with purple dot indicator, overrides with yellow dot
+
 ### Modifying Calculation Logic
 - Core algorithm in `src/services/calculator.ts`: `calculateRecursiveCycles()`
+- Compound interest functions: `calculateCompoundInterest()` and `calculateNetCompoundInterest()`
 - Adjust cycle limits, Health Factor thresholds, or formulas here
 - Update `RecursiveSimulation` type if adding new output fields
+- **Important**: If modifying interest calculations, also update `chartDataGenerator.ts` for consistency
+
+### Modifying Compound Interest Logic
+- Core logic in `src/services/calculator.ts`: `calculateCompoundInterest()` and `calculateNetCompoundInterest()`
+- In `chartDataGenerator.ts`: same functions used for graph data
+- Frequency options: daily (365), weekly (52), monthly (12), quarterly (4), custom (N days)
+- To adjust: modify periodsPerYear calculation in `getPeriodsPerYear()` function
+- Remember to update both `calculator.ts` AND `chartDataGenerator.ts` for consistency
+
+### Modifying Chart Visualizations
+- Charts in `src/components/ResultsDisplay.tsx` use Recharts with data from `chartDataGenerator.ts`
+- Three charts displayed (only Compound Growth shown if compounding enabled):
+  1. **Compound Growth** (line chart) - Simple vs compound interest over 5 years
+  2. **Position Value Evolution** (area chart) - 5-year projection of total position value
+  3. **Cycles Progression** (bar chart) - Collateral vs debt accumulated per cycle
+- To add a new chart:
+  1. Create data generator function in `chartDataGenerator.ts` (export interface + function)
+  2. Import and call it in `ResultsDisplay.tsx`
+  3. Use ResponsiveContainer from recharts with desired chart type (LineChart, AreaChart, BarChart, etc.)
+  4. Style with theme colors: purple (#8b5cf6), green (#10b981), blue (#3b82f6), red (#ef4444)
 
 ### Improving UI/Results Display
 - Charts in `src/components/ResultsDisplay.tsx` use Recharts
 - Add new stat cards in the summary section
-- Temporal projections calculated from annual APY (divide by 12 for months)
+- Temporal projections now generated with compound interest support
+- Custom asset data merged with live Aave data in dropdown
 
 ### Testing with Different Assets
 - Change dropdown in Calculator to see live rate updates (automatic RPC call)
 - Each asset fetch is independent - failures fall back to mock data
 - DevTools Network tab shows `eth.llamarpc.com` POST requests with contract calls
+- Test custom assets by clicking "Custom Assets" button and creating test entries
+- Custom assets persist across browser sessions (stored in localStorage)

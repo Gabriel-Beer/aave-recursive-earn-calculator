@@ -11,8 +11,16 @@ import {
   ResponsiveContainer,
   Area,
   AreaChart,
+  BarChart,
+  Bar,
+  Cell,
 } from 'recharts';
 import Tooltip from './Tooltip';
+import {
+  generateCompoundGrowthChart,
+  generateMonthlyProjections,
+  generatePositionEvolutionChart,
+} from '@/services/chartDataGenerator';
 
 interface ResultsDisplayProps {
   results: RecursiveSimulation;
@@ -91,14 +99,8 @@ const ResultsDisplay: FC<ResultsDisplayProps> = ({ results }) => {
   const healthFactor = parseFloat(results.riskMetrics.healthFactor) || 0;
   const annualInterest = parseFloat(results.totalInterestEarned);
 
-  // Calculate projections for different time periods
-  const projections = [
-    { period: '1 mois', months: 1, interest: annualInterest / 12 },
-    { period: '3 mois', months: 3, interest: (annualInterest / 12) * 3 },
-    { period: '6 mois', months: 6, interest: (annualInterest / 12) * 6 },
-    { period: '1 an', months: 12, interest: annualInterest },
-    { period: '2 ans', months: 24, interest: annualInterest * 2 },
-  ];
+  // Use time projections from calculation results
+  const projections = results.timeProjections;
 
   return (
     <div className="space-y-6">
@@ -287,36 +289,60 @@ const ResultsDisplay: FC<ResultsDisplayProps> = ({ results }) => {
             <circle cx="12" cy="12" r="10"/>
             <polyline points="12 6 12 12 16 14"/>
           </svg>
-          Projection des gains dans le temps
+          Projections temporelles
+          {results.compoundingConfig.enabled && (
+            <span className="ml-2 text-sm text-purple-400">
+              (avec réinvestissement {results.compoundingConfig.frequencyLabel.toLowerCase()})
+            </span>
+          )}
         </h3>
         <p className="text-sm text-slate-400 mb-4">
-          Estimation des interets nets selon la duree de maintien de la position (taux constants)
+          Estimation des intérêts nets selon la durée de maintien de la position (taux constants)
         </p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          {projections.map((proj) => (
-            <div
-              key={proj.period}
-              className={`p-4 rounded-xl border text-center transition-all ${
-                proj.months === 12
-                  ? 'bg-green-500/10 border-green-500/30'
-                  : 'bg-slate-800/50 border-slate-700 hover:border-slate-600'
-              }`}
-            >
-              <p className={`text-xs mb-1 ${proj.months === 12 ? 'text-green-400' : 'text-slate-400'}`}>
-                {proj.period}
-              </p>
-              <p className={`text-lg font-bold ${
-                proj.interest >= 0 ? 'text-green-400' : 'text-red-400'
-              }`}>
-                {proj.interest >= 0 ? '+' : ''}${proj.interest.toFixed(2)}
-              </p>
-              {proj.months === 12 && (
-                <span className="inline-block mt-1 text-[10px] bg-green-500/20 text-green-300 px-2 py-0.5 rounded-full">
-                  Base annuelle
-                </span>
-              )}
-            </div>
-          ))}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {projections.map((proj) => {
+            const interestCompound = parseFloat(proj.interestCompound);
+            const interestSimple = parseFloat(proj.interestSimple);
+            return (
+              <div
+                key={proj.period}
+                className={`p-4 rounded-xl border text-center transition-all ${
+                  proj.months === 12
+                    ? 'bg-green-500/10 border-green-500/30'
+                    : 'bg-slate-800/50 border-slate-700 hover:border-slate-600'
+                }`}
+              >
+                <p className={`text-xs mb-2 ${proj.months === 12 ? 'text-green-400' : 'text-slate-400'}`}>
+                  {proj.period}
+                </p>
+                <p className={`text-lg font-bold ${
+                  interestCompound >= 0 ? 'text-green-400' : 'text-red-400'
+                }`}>
+                  {interestCompound >= 0 ? '+' : ''}${interestCompound.toFixed(2)}
+                </p>
+
+                {/* Show comparison if compounding is enabled */}
+                {results.compoundingConfig.enabled && (
+                  <p className="text-xs text-slate-500 mt-1">
+                    vs ${interestSimple.toFixed(2)} sans réinvest.
+                  </p>
+                )}
+
+                <p className="text-xs text-slate-400 mt-2">
+                  Valeur: ${parseFloat(proj.totalValueCompound).toLocaleString('fr-FR', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                  })}
+                </p>
+
+                {proj.months === 12 && (
+                  <span className="inline-block mt-2 text-[10px] bg-green-500/20 text-green-300 px-2 py-0.5 rounded-full">
+                    Base annuelle
+                  </span>
+                )}
+              </div>
+            );
+          })}
         </div>
         <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
           <p className="text-xs text-blue-300 flex items-start gap-2">
@@ -327,8 +353,139 @@ const ResultsDisplay: FC<ResultsDisplayProps> = ({ results }) => {
             </svg>
             <span>
               Ces projections supposent des taux constants. Les taux Aave varient en fonction de l&apos;offre et la demande.
-              Les gains reels peuvent differer significativement.
+              Les gains réels peuvent différer significativement.
             </span>
+          </p>
+        </div>
+      </div>
+
+      {/* Compound Growth Chart - Shows the power of compound interest over time */}
+      {results.compoundingConfig.enabled && (
+        <div className="card-elevated">
+          <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-purple-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+              <polyline points="17 6 23 6 23 12"/>
+            </svg>
+            Croissance avec réinvestissement
+          </h3>
+          <p className="text-sm text-slate-400 mb-4">
+            Comparaison entre intérêts simples et composés au fil du temps
+          </p>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={generateCompoundGrowthChart(results)}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#334155"/>
+              <XAxis dataKey="time" stroke="#94a3b8"/>
+              <YAxis stroke="#94a3b8" />
+              <RechartsTooltip
+                contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569' }}
+                formatter={(value) => typeof value === 'number' ? `$${value.toFixed(2)}` : value}
+              />
+              <Legend />
+              <Line
+                type="monotone"
+                dataKey="compoundInterest"
+                stroke="#8b5cf6"
+                strokeWidth={3}
+                name="Intérêts composés"
+                dot={{ fill: '#8b5cf6', r: 4 }}
+                activeDot={{ r: 6 }}
+              />
+              <Line
+                type="monotone"
+                dataKey="simpleInterest"
+                stroke="#64748b"
+                strokeWidth={2}
+                strokeDasharray="5 5"
+                name="Intérêts simples"
+                dot={{ fill: '#64748b', r: 3 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+          <div className="mt-4 p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+            <p className="text-xs text-purple-300">
+              Le graphique montre comment l'argent croît plus vite avec réinvestissement automatique.
+              La différence s'accélère au fil du temps (effet exponentiel).
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Total Value Evolution Chart */}
+      <div className="card-elevated">
+        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-green-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+          </svg>
+          Valeur de la position dans le temps
+        </h3>
+        <p className="text-sm text-slate-400 mb-4">
+          Évolution du capital avec les intérêts accumulés (projection sur 5 ans)
+        </p>
+        <ResponsiveContainer width="100%" height={300}>
+          <AreaChart data={generateMonthlyProjections(results, 60)}>
+            <defs>
+              <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#334155"/>
+            <XAxis dataKey="time" stroke="#94a3b8"/>
+            <YAxis stroke="#94a3b8" />
+            <RechartsTooltip
+              contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569' }}
+              formatter={(value) => typeof value === 'number' ? `$${value.toFixed(2)}` : value}
+            />
+            <Area
+              type="monotone"
+              dataKey="totalValue"
+              stroke="#10b981"
+              strokeWidth={3}
+              fillOpacity={1}
+              fill="url(#colorValue)"
+              name="Valeur totale"
+              dot={{ fill: '#10b981', r: 3 }}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+        <div className="mt-4 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
+          <p className="text-xs text-green-300">
+            Ce graphique montre votre capital initial plus les intérêts accumulés au fil du temps.
+          </p>
+        </div>
+      </div>
+
+      {/* Cycles Progression Chart */}
+      <div className="card-elevated">
+        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M12 6v6l4 2"/>
+          </svg>
+          Progression par cycle
+        </h3>
+        <p className="text-sm text-slate-400 mb-4">
+          Collateral, dette et levier accumulés à chaque cycle
+        </p>
+        <ResponsiveContainer width="100%" height={300}>
+          <BarChart data={generatePositionEvolutionChart(results)}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#334155"/>
+            <XAxis dataKey="cycle" stroke="#94a3b8"/>
+            <YAxis stroke="#94a3b8"/>
+            <RechartsTooltip
+              contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569' }}
+              formatter={(value) => typeof value === 'number' ? `$${value.toFixed(2)}` : value}
+            />
+            <Legend />
+            <Bar dataKey="collateral" fill="#3b82f6" name="Collateral" radius={[4, 4, 0, 0]}/>
+            <Bar dataKey="debt" fill="#ef4444" name="Emprunts" radius={[4, 4, 0, 0]}/>
+          </BarChart>
+        </ResponsiveContainer>
+        <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+          <p className="text-xs text-blue-300">
+            Chaque cycle ajoute du collateral (bleu) et augmente la dette (rouge).
+            La différence (bleu - rouge) est votre position nette.
           </p>
         </div>
       </div>

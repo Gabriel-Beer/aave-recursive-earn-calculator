@@ -15,6 +15,9 @@ interface CalculatorInputs {
   numberOfCycles: string;
   targetHealthFactor: string;
   borrowPercentage: string; // 50 to 100
+  autoReinvest: string; // 'true' | 'false'
+  harvestFrequencyType: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'custom';
+  customHarvestDays: string;
 }
 
 const TOOLTIPS = {
@@ -35,6 +38,9 @@ const Calculator: FC = () => {
     numberOfCycles: '3',
     targetHealthFactor: '1.5',
     borrowPercentage: '80',
+    autoReinvest: 'false',
+    harvestFrequencyType: 'monthly',
+    customHarvestDays: '30',
   });
 
   const [results, setResults] = useState<RecursiveSimulation | null>(null);
@@ -174,6 +180,9 @@ const Calculator: FC = () => {
         targetHealthFactor: parseFloat(inputs.targetHealthFactor),
         borrowPercentage: parseFloat(inputs.borrowPercentage) / 100, // Convert to decimal
         mode: calculationMode,
+        autoReinvest: inputs.autoReinvest,
+        harvestFrequencyType: inputs.harvestFrequencyType,
+        customHarvestDays: inputs.customHarvestDays,
       });
 
       setResults(simulation);
@@ -450,6 +459,65 @@ const Calculator: FC = () => {
                 : '⚠️ Agressif - Rendement maximum mais risque de liquidation accru'}
             </p>
           </div>
+
+          {/* Auto-Reinvestment Toggle */}
+          <div className="input-group md:col-span-2">
+            <label className="flex items-center justify-between">
+              <span className="input-label mb-0">Réinvestissement automatique des intérêts</span>
+              <button
+                type="button"
+                onClick={() => handleInputChange('autoReinvest', inputs.autoReinvest === 'true' ? 'false' : 'true')}
+                className={`relative inline-flex h-8 w-16 items-center rounded-full transition-colors ${
+                  inputs.autoReinvest === 'true'
+                    ? 'bg-purple-600'
+                    : 'bg-slate-700'
+                }`}
+              >
+                <span
+                  className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                    inputs.autoReinvest === 'true' ? 'translate-x-9' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </label>
+            <p className="text-xs text-slate-400 mt-2">
+              {inputs.autoReinvest === 'true'
+                ? 'Les intérêts sont réinvestis automatiquement (croissance exponentielle)'
+                : 'Les intérêts s\'accumulent séparément (croissance linéaire)'}
+            </p>
+          </div>
+
+          {/* Harvest Frequency (only shown if autoReinvest is true) */}
+          {inputs.autoReinvest === 'true' && (
+            <div className="input-group md:col-span-2">
+              <label className="input-label">Fréquence de récolte et réinvestissement</label>
+              <div className="grid grid-cols-2 gap-3">
+                <select
+                  value={inputs.harvestFrequencyType}
+                  onChange={(e) => handleInputChange('harvestFrequencyType', e.target.value as any)}
+                  className="input-field"
+                >
+                  <option value="daily">Quotidien (365x/an)</option>
+                  <option value="weekly">Hebdomadaire (52x/an)</option>
+                  <option value="monthly">Mensuel (12x/an)</option>
+                  <option value="quarterly">Trimestriel (4x/an)</option>
+                  <option value="custom">Personnalisé (jours)</option>
+                </select>
+
+                {inputs.harvestFrequencyType === 'custom' && (
+                  <input
+                    type="number"
+                    value={inputs.customHarvestDays}
+                    onChange={(e) => handleInputChange('customHarvestDays', e.target.value)}
+                    placeholder="Nombre de jours"
+                    min="1"
+                    max="365"
+                    className="input-field"
+                  />
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Number of Cycles - Primary in cycles mode */}
           <div className={`input-group ${calculationMode === 'healthFactor' ? 'opacity-60' : ''}`}>
