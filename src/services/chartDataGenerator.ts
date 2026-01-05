@@ -135,6 +135,7 @@ export function generatePositionEvolutionChart(results: RecursiveSimulation): Po
 
 /**
  * Generate cumulative interest earned over cycles
+ * Calculates interest based on collateral and debt at each cycle
  */
 export interface InterestEarnedPoint {
   cycle: string;
@@ -143,17 +144,48 @@ export interface InterestEarnedPoint {
 }
 
 export function generateInterestEarnedChart(results: RecursiveSimulation): InterestEarnedPoint[] {
+  const supplyAPY = parseFloat(results.supplyAPY) / 100;
+  const borrowAPY = parseFloat(results.borrowAPY) / 100;
+  const periodsPerYear = results.compoundingConfig.periodsPerYear;
+  const isCompounding = results.compoundingConfig.enabled;
+
+  // Time per cycle (assuming all cycles happen within one period)
+  const timePerCycle = 1 / results.progressionByRound.length; // Simplified: assume equal time per cycle
+
   let cumulativeInterest = 0;
 
   return results.progressionByRound.map((round, index) => {
-    // Estimate interest earned in this cycle
-    // For simplicity, we'll distribute the total interest equally
-    const interestPerCycle = parseFloat(results.totalInterestEarned) / results.progressionByRound.length;
-    cumulativeInterest += interestPerCycle;
+    const collateral = parseFloat(round.collateralAmount);
+    const debt = parseFloat(round.borrowAmount);
+
+    // Calculate interest earned in this cycle
+    let interestEarned = 0;
+
+    if (isCompounding && periodsPerYear > 0) {
+      // Compound interest for this cycle's collateral and debt
+      const supplyInterest = calculateCompoundInterest(
+        collateral,
+        supplyAPY,
+        periodsPerYear,
+        timePerCycle
+      );
+      const borrowInterest = calculateCompoundInterest(
+        debt,
+        borrowAPY,
+        periodsPerYear,
+        timePerCycle
+      );
+      interestEarned = supplyInterest - borrowInterest;
+    } else {
+      // Simple interest for this cycle
+      interestEarned = collateral * supplyAPY * timePerCycle - debt * borrowAPY * timePerCycle;
+    }
+
+    cumulativeInterest += interestEarned;
 
     return {
       cycle: `Cycle ${round.round}`,
-      interestEarned: interestPerCycle,
+      interestEarned: interestEarned,
       cumulativeInterest: cumulativeInterest,
     };
   });
